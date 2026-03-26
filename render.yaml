@@ -4,7 +4,7 @@ services:
     name: sales-crm-api
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install --build-from-source
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
@@ -13,7 +13,7 @@ services:
         value: 3001
       - key: FRONTEND_URL
         sync: false          # Set this manually in the Render dashboard
-      - key: GMAIL_REDIRECT_URI
+      - key: GMAIL_REDIRECT_UR
         sync: false          # Set to: https://sales-crm-api.onrender.com/api/gmail/callback
     disk:
       name: crm-data
