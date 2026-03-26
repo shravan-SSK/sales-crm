@@ -8,6 +8,7 @@ import Pipeline from './pages/Pipeline'
 import Activities from './pages/Activities'
 import Settings from './pages/Settings'
 import EmailThreads from './pages/EmailThreads'
+import Sources from './pages/Sources'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="activities" element={<Activities />} />
           <Route path="emails" element={<EmailThreads />} />
+          <Route path="sources" element={<Sources />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
