@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import {
   LayoutDashboard, Users, UserCheck, Building2, Kanban,
-  Activity, Mail, Settings, Search, Bell, ChevronRight, X
+  Activity, Mail, Settings, Search, Bell, ChevronRight, X, Tag
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { activitiesApi, searchApi } from '../api'
@@ -10,6 +10,7 @@ import { activitiesApi, searchApi } from '../api'
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/leads', icon: UserCheck, label: 'Leads' },
+  { to: '/sources', icon: Tag, label: 'Sources' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/accounts', icon: Building2, label: 'Accounts' },
   { to: '/pipeline', icon: Kanban, label: 'Pipeline' },
