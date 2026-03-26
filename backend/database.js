@@ -1,10 +1,11 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-
-// On Render, use the persistent disk at /data. Locally, store next to server.js.
-const DB_PATH = process.env.NODE_ENV === 'production'
-  ? '/data/crm.db'
-  : path.join(__dirname, 'crm.db');
+// DB_PATH env var takes precedence; falls back to /data in production (needs disk) or __dirname locally.
+const DB_PATH = process.env.DB_PATH || (
+  process.env.NODE_ENV === 'production'
+      ? '/data/crm.db'
+          : path.join(__dirname, 'crm.db')
+          );
 
 let db;
 
