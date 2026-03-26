@@ -1,7 +1,27 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { gmailApi } from '../api'
-import { Mail, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from 'lucide-react'
+import { Mail, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Copy, Check, BookMarked } from 'lucide-react'
+
+// Build the LinkedIn bookmarklet JS
+// When user clicks it on a LinkedIn profile page, it opens the CRM Leads page with pre-filled data
+function buildBookmarklet(crmUrl) {
+  const fn = `(function(){
+  try{
+    var u=window.location.href;
+    if(!u.includes('linkedin.com/in/')){alert('Please navigate to a LinkedIn profile page first.');return;}
+    var n=document.querySelector('h1')||document.querySelector('.top-card-layout__title');
+    var name=n?n.innerText.trim():'';
+    var h=document.querySelector('.text-body-medium,.top-card-layout__headline,.pv-text-details__left-panel h2');
+    var headline=h?h.innerText.trim().split('\\n')[0]:'';
+    var c=document.querySelector('.pv-text-details__right-panel .hoverable-link-text,.top-card-layout__first-subline');
+    var company=c?c.innerText.trim().split('\\n')[0]:'';
+    var params=new URLSearchParams({import:'1',name:name,title:headline,company:company,linkedin_url:u});
+    window.open('${crmUrl}/leads?'+params.toString(),'_blank');
+  }catch(e){alert('Could not extract profile data. Please try again on a LinkedIn profile page.');}
+  })()`;
+  return 'javascript:' + fn.replace(/\s+/g, ' ');
+}
 
 export default function Settings() {
   const qc = useQueryClient()
@@ -12,6 +32,10 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [message, setMessage] = useState(null)
+  const [bookmarkletCopied, setBookmarkletCopied] = useState(false)
+
+  const crmUrl = window.location.origin
+  const bookmarklet = buildBookmarklet(crmUrl)
 
   const saveCreds = async () => {
     setSaving(true)
@@ -30,7 +54,6 @@ export default function Settings() {
     try {
       const { url } = await gmailApi.getAuthUrl()
       const popup = window.open(url, '_blank', 'width=500,height=600')
-      // Poll for popup close
       const interval = setInterval(() => {
         if (popup.closed) {
           clearInterval(interval)
@@ -50,6 +73,13 @@ export default function Settings() {
     await gmailApi.disconnect()
     qc.invalidateQueries(['gmail-status'])
     refetchStatus()
+  }
+
+  const copyBookmarklet = () => {
+    navigator.clipboard.writeText(bookmarklet).then(() => {
+      setBookmarkletCopied(true)
+      setTimeout(() => setBookmarkletCopied(false), 2000)
+    })
   }
 
   return (
@@ -138,26 +168,64 @@ export default function Settings() {
         )}
       </div>
 
-      {/* LinkedIn Note */}
+      {/* LinkedIn Bookmarklet */}
       <div className="card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-blue-600">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#e8f0fe' }}>
+            <svg viewBox="0 0 24 24" fill="#0a66c2" className="w-5 h-5">
               <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
             </svg>
           </div>
           <div>
-            <h2 className="font-semibold">LinkedIn Profile Scanner</h2>
-            <p className="text-sm text-gray-500">Enrich contact profiles from LinkedIn</p>
+            <h2 className="font-semibold">LinkedIn Browser Scanner</h2>
+            <p className="text-sm text-gray-500">Import leads directly from LinkedIn profiles — no API required</p>
           </div>
         </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
-          <AlertTriangle size={16} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-yellow-700">
-            <p className="font-medium">Public profile data only</p>
-            <p className="text-xs mt-1">The LinkedIn scanner extracts publicly available info (name, headline, company) from profile URLs. For full enrichment, consider a service like <a href="https://nubela.co/proxycurl" target="_blank" rel="noopener noreferrer" className="underline">Proxycurl API</a> which provides authenticated access to LinkedIn data.</p>
-            <p className="text-xs mt-1">To scan a contact, open their profile from the Contacts page and paste their LinkedIn URL.</p>
-          </div>
+
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mb-4">
+          <h3 className="text-sm font-semibold text-indigo-900 mb-1">How it works</h3>
+          <p className="text-xs text-indigo-700 mb-3">
+            Install the bookmarklet below in your browser. When you visit any LinkedIn profile, click it and the lead will be imported directly into your CRM — using <strong>your own browser session</strong>, with no external APIs.
+          </p>
+          <ol className="text-xs text-indigo-700 space-y-1.5 list-decimal list-inside">
+            <li>Drag the button below to your browser bookmarks bar, <em>or</em> copy the code and create a bookmark manually.</li>
+            <li>Navigate to any LinkedIn profile in your browser (you must be logged in to LinkedIn).</li>
+            <li>Click the bookmarklet — it will open the Add Lead form in your CRM with the profile pre-filled.</li>
+            <li>Review the data and click <strong>Save Lead</strong>.</li>
+          </ol>
+        </div>
+
+        {/* Drag-to-bookmarks bar button */}
+        <div className="flex items-center gap-3 mb-3">
+          <a
+            href={bookmarklet}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-semibold shadow-sm cursor-grab active:cursor-grabbing select-none"
+            style={{ backgroundColor: '#0a66c2' }}
+            onClick={e => { e.preventDefault(); alert('Drag this button to your bookmarks bar to install it.') }}
+            draggable="true"
+          >
+            <BookMarked size={15} />
+            Import to CRM
+          </a>
+          <span className="text-xs text-gray-400">← drag this to your bookmarks bar</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={copyBookmarklet}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            {bookmarkletCopied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+            {bookmarkletCopied ? 'Copied!' : 'Copy bookmarklet code'}
+          </button>
+          <span className="text-xs text-gray-400">
+            Paste as the URL of a new bookmark if drag-drop does not work.
+          </span>
+        </div>
+
+        <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-700">
+          <strong>Tip:</strong> The bookmarklet reads name, title/headline, and company from the LinkedIn page.
+          It works best when you are logged in to LinkedIn. All data is editable before saving.
         </div>
       </div>
 
