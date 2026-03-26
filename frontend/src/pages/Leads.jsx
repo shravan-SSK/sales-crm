@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { leadsApi } from '../api'
-import { Plus, Search, UserCheck, ChevronRight, Trash2, ArrowRight } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { leadsApi, sourcesApi } from '../api'
+import { Plus, Search, UserCheck, ChevronRight, Trash2, ArrowRight, Linkedin } from 'lucide-react'
 import Modal from '../components/Modal'
 
 const STATUS_COLORS = {
@@ -20,12 +21,26 @@ function LeadForm({ initial = {}, onSubmit, onCancel, isLoading }) {
     phone: initial.phone || '',
     company: initial.company || '',
     title: initial.title || '',
-    source: initial.source || 'manual',
+    source: initial.source || '',
     status: initial.status || 'new',
     notes: initial.notes || '',
   })
 
+  const { data: sources = [] } = useQuery({
+    queryKey: ['sources'],
+    queryFn: sourcesApi.getAll,
+  })
+
+  // Set default source to first active source when sources load (only if not already set)
+  useEffect(() => {
+    if (sources.length > 0 && !form.source) {
+      const active = sources.filter(s => s.is_active)
+      if (active.length > 0) setForm(f => ({ ...f, source: active[0].name }))
+    }
+  }, [sources])
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const activeSources = sources.filter(s => s.is_active)
 
   return (
     <form onSubmit={e => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
@@ -40,15 +55,27 @@ function LeadForm({ initial = {}, onSubmit, onCancel, isLoading }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Title</label><input className="input" value={form.title} onChange={e => set('title', e.target.value)} /></div>
-        <div><label className="label">Source</label>
-          <select className="input" value={form.source} onChange={e => set('source', e.target.value)}>
-            <option value="manual">Manual</option>
-            <option value="gmail">Gmail</option>
-            <option value="website">Website</option>
-            <option value="referral">Referral</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="event">Event</option>
-          </select>
+        <div>
+          <label className="label">
+            Source
+            {activeSources.length === 0 && (
+              <a href="/sources" className="ml-2 text-xs text-blue-500 hover:underline" onClick={e => e.stopPropagation()}>
+                Manage sources →
+              </a>
+            )}
+          </label>
+          {activeSources.length > 0 ? (
+            <select className="input" value={form.source} onChange={e => set('source', e.target.value)}>
+              {activeSources.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="input bg-gray-50 text-gray-400 text-sm cursor-not-allowed">
+              No sources configured —{' '}
+              <a href="/sources" className="text-blue-500 hover:underline">add some</a>
+            </div>
+          )}
         </div>
       </div>
       <div><label className="label">Status</label>
@@ -73,17 +100,54 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [importPrefill, setImportPrefill] = useState(null)
   const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Handle bookmarklet imports via URL params: /leads?import=1&name=...&title=...&company=...&linkedin_url=...
+  useEffect(() => {
+    if (searchParams.get('import') === '1') {
+      const name = searchParams.get('name') || ''
+      const nameParts = name.trim().split(' ')
+      const prefill = {
+        first_name: nameParts[0] || '',
+        last_name: nameParts.slice(1).join(' ') || '',
+        title: searchParams.get('title') || '',
+        company: searchParams.get('company') || '',
+        notes: searchParams.get('linkedin_url')
+          ? `LinkedIn: ${searchParams.get('linkedin_url')}`
+          : '',
+        source: 'LinkedIn',
+        status: 'new',
+      }
+      setImportPrefill(prefill)
+      setShowModal(true)
+      // Clean up URL params
+      setSearchParams({})
+    }
+  }, [])
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ['leads', search, statusFilter],
     queryFn: () => leadsApi.getAll({ search, status: statusFilter || undefined }),
   })
 
-  const createMut = useMutation({ mutationFn: leadsApi.create, onSuccess: () => { qc.invalidateQueries(['leads']); qc.invalidateQueries(['dashboard']); setShowModal(false) } })
+  const { data: sources = [] } = useQuery({
+    queryKey: ['sources'],
+    queryFn: sourcesApi.getAll,
+  })
+
+  const createMut = useMutation({
+    mutationFn: leadsApi.create,
+    onSuccess: () => { qc.invalidateQueries(['leads']); qc.invalidateQueries(['dashboard']); setShowModal(false); setImportPrefill(null) }
+  })
   const updateMut = useMutation({ mutationFn: ({ id, data }) => leadsApi.update(id, data), onSuccess: () => { qc.invalidateQueries(['leads']); setEditing(null) } })
   const deleteMut = useMutation({ mutationFn: leadsApi.delete, onSuccess: () => { qc.invalidateQueries(['leads']); qc.invalidateQueries(['dashboard']) } })
   const convertMut = useMutation({ mutationFn: leadsApi.convert, onSuccess: () => { qc.invalidateQueries(['leads']); qc.invalidateQueries(['contacts']); qc.invalidateQueries(['dashboard']) } })
+
+  // Map source name → color for badges
+  const sourceColorMap = Object.fromEntries(sources.map(s => [s.name.toLowerCase(), s.color]))
+  const getSourceColor = (sourceName) => sourceColorMap[sourceName?.toLowerCase()] || '#6b7280'
 
   return (
     <div className="space-y-5">
@@ -92,7 +156,7 @@ export default function Leads() {
           <h1 className="text-2xl font-bold">Leads</h1>
           <p className="text-sm text-gray-500">{leads.length} leads total</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}>
+        <button className="btn-primary flex items-center gap-2" onClick={() => { setImportPrefill(null); setShowModal(true) }}>
           <Plus size={16} /> Add Lead
         </button>
       </div>
@@ -148,7 +212,14 @@ export default function Leads() {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{lead.company || '—'}</td>
-                <td className="px-4 py-3"><span className="capitalize text-sm text-gray-600">{lead.source}</span></td>
+                <td className="px-4 py-3">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                    style={{ backgroundColor: getSourceColor(lead.source) }}
+                  >
+                    {lead.source}
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <span className={`badge ${STATUS_COLORS[lead.status] || 'bg-gray-100 text-gray-600'}`}>
                     {lead.status}
@@ -178,8 +249,13 @@ export default function Leads() {
         </table>
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add New Lead">
-        <LeadForm onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending} />
+      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setImportPrefill(null) }} title={importPrefill ? 'Import LinkedIn Lead' : 'Add New Lead'}>
+        <LeadForm
+          initial={importPrefill || {}}
+          onSubmit={createMut.mutate}
+          onCancel={() => { setShowModal(false); setImportPrefill(null) }}
+          isLoading={createMut.isPending}
+        />
       </Modal>
 
       <Modal isOpen={!!editing} onClose={() => setEditing(null)} title="Edit Lead">
