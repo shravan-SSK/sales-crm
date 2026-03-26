@@ -1,11 +1,12 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-// DB_PATH env var takes precedence; falls back to /data in production (needs disk) or __dirname locally.
+
+// DB_PATH env var takes precedence; falls back to /data in production or __dirname locally.
 const DB_PATH = process.env.DB_PATH || (
   process.env.NODE_ENV === 'production'
-      ? '/data/crm.db'
-          : path.join(__dirname, 'crm.db')
-          );
+    ? '/data/crm.db'
+    : path.join(__dirname, 'crm.db')
+);
 
 let db;
 
@@ -125,12 +126,36 @@ function initSchema() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS sources (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT DEFAULT '#6366f1',
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
     CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
     CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
     CREATE INDEX IF NOT EXISTS idx_activities_due_date ON activities(due_date);
     CREATE INDEX IF NOT EXISTS idx_activities_completed ON activities(completed);
   `);
+
+  // Seed default sources if the table is empty
+  const sourceCount = db.prepare('SELECT COUNT(*) as n FROM sources').get().n;
+  if (sourceCount === 0) {
+    const insert = db.prepare('INSERT OR IGNORE INTO sources (id, name, color) VALUES (?, ?, ?)');
+    const defaults = [
+      ['src_manual',   'Manual',   '#6b7280'],
+      ['src_gmail',    'Gmail',    '#ef4444'],
+      ['src_website',  'Website',  '#3b82f6'],
+      ['src_referral', 'Referral', '#10b981'],
+      ['src_linkedin', 'LinkedIn', '#0a66c2'],
+      ['src_event',    'Event',    '#f59e0b'],
+    ];
+    for (const [id, name, color] of defaults) insert.run(id, name, color);
+  }
 }
 
 module.exports = { getDb };
