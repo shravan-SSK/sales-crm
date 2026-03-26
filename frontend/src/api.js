@@ -27,6 +27,7 @@ export const contactsApi = {
   update: (id, data) => api.put(`/contacts/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/contacts/${id}`).then(r => r.data),
   scanLinkedIn: (id, url) => api.post(`/contacts/${id}/linkedin-scan`, { linkedin_url: url }).then(r => r.data),
+  saveLinkedInData: (id, data) => api.post(`/contacts/${id}/linkedin-data`, data).then(r => r.data),
 }
 
 export const accountsApi = {
@@ -64,6 +65,15 @@ export const gmailApi = {
   sync: (params) => api.post('/gmail/sync', params).then(r => r.data),
   disconnect: () => api.post('/gmail/disconnect').then(r => r.data),
   getThreads: () => api.get('/gmail/threads').then(r => r.data),
+}
+
+export const sourcesApi = {
+  getAll: () => api.get('/sources').then(r => r.data),
+  getStats: () => api.get('/sources/stats/overview').then(r => r.data),
+  get: (id) => api.get(`/sources/${id}`).then(r => r.data),
+  create: (data) => api.post('/sources', data).then(r => r.data),
+  update: (id, data) => api.put(`/sources/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/sources/${id}`).then(r => r.data),
 }
 
 export const dashboardApi = {
