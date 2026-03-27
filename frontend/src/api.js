@@ -18,6 +18,8 @@ export const leadsApi = {
   update: (id, data) => api.put(`/leads/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/leads/${id}`).then(r => r.data),
   convert: (id) => api.post(`/leads/${id}/convert`).then(r => r.data),
+  requestScan: (id, linkedin_url) => api.post(`/leads/${id}/scan-request`, { linkedin_url }).then(r => r.data),
+  saveLinkedInData: (id, data) => api.post(`/leads/${id}/linkedin-data`, data).then(r => r.data),
 }
 
 export const contactsApi = {
@@ -26,8 +28,13 @@ export const contactsApi = {
   create: (data) => api.post('/contacts', data).then(r => r.data),
   update: (id, data) => api.put(`/contacts/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/contacts/${id}`).then(r => r.data),
-  scanLinkedIn: (id, url) => api.post(`/contacts/${id}/linkedin-scan`, { linkedin_url: url }).then(r => r.data),
+  requestScan: (id, linkedin_url) => api.post(`/contacts/${id}/scan-request`, { linkedin_url }).then(r => r.data),
   saveLinkedInData: (id, data) => api.post(`/contacts/${id}/linkedin-data`, data).then(r => r.data),
+}
+
+export const scanQueueApi = {
+  getQueue: (status) => api.get('/scan-queue', { params: { status } }).then(r => r.data),
+  markFailed: (type, id) => api.post(`/scan-queue/${type}/${id}/fail`).then(r => r.data),
 }
 
 export const accountsApi = {
