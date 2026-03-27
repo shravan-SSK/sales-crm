@@ -142,6 +142,17 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_activities_completed ON activities(completed);
   `);
 
+  // Idempotent migrations: add linkedin fields to leads and contacts
+  const migrations = [
+    `ALTER TABLE leads ADD COLUMN linkedin_url TEXT`,
+    `ALTER TABLE leads ADD COLUMN linkedin_data TEXT`,
+    `ALTER TABLE leads ADD COLUMN linkedin_scan_status TEXT DEFAULT 'none'`,
+    `ALTER TABLE contacts ADD COLUMN linkedin_scan_status TEXT DEFAULT 'none'`,
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch(e) { /* column already exists */ }
+  }
+
   // Seed default sources if the table is empty
   const sourceCount = db.prepare('SELECT COUNT(*) as n FROM sources').get().n;
   if (sourceCount === 0) {
