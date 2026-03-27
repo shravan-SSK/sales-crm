@@ -34,6 +34,7 @@ app.use('/api/activities', require('./routes/activities'));
 app.use('/api/gmail', require('./routes/gmail'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/sources', require('./routes/sources'));
+app.use('/api/scan-queue', require('./routes/scan-queue'));
 
 // Settings
 app.get('/api/settings', (req, res) => {
