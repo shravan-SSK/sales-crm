@@ -108,34 +108,26 @@ router.put('/:id', (req, res) => {
   res.json(db.prepare('SELECT * FROM contacts WHERE id = ?').get(req.params.id));
 });
 
-// POST receive browser-extracted LinkedIn data (from bookmarklet)
+// POST receive browser-extracted LinkedIn data (from Claude in Chrome scan or bookmarklet)
 router.post('/:id/linkedin-data', (req, res) => {
   const db = getDb();
   const contact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(req.params.id);
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-  const { first_name, last_name, headline, company, location, linkedin_url, name, image } = req.body;
-
+  const data = req.body;
   const profileData = {
-    name: name || `${first_name || ''} ${last_name || ''}`.trim(),
-    first_name: first_name || (name ? name.split(' ')[0] : '') || '',
-    last_name: last_name || (name ? name.split(' ').slice(1).join(' ') : '') || '',
-    headline: headline || '',
-    company: company || '',
-    location: location || '',
-    image: image || '',
-    url: linkedin_url || '',
-    scraped_at: new Date().toISOString(),
-    source: 'linkedin_browser',
+    ...data,
+    scraped_at: data.scraped_at || new Date().toISOString(),
+    source: data.source || 'linkedin_chrome',
   };
 
   db.prepare(`
-    UPDATE contacts SET linkedin_url=?, linkedin_data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(linkedin_url || contact.linkedin_url, JSON.stringify(profileData), req.params.id);
+    UPDATE contacts SET linkedin_url=?, linkedin_data=?, linkedin_scan_status='done', updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `).run(data.url || data.linkedin_url || contact.linkedin_url, JSON.stringify(profileData), req.params.id);
 
+  // Update title/company from LinkedIn if currently empty
   const updates = {};
-  if (!contact.title && profileData.headline) updates.title = profileData.headline;
-
+  if (!contact.title && (data.headline || data.current_title)) updates.title = data.headline || data.current_title;
   if (Object.keys(updates).length > 0) {
     const sets = Object.keys(updates).map(k => `${k}=?`).join(', ');
     db.prepare(`UPDATE contacts SET ${sets}, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
@@ -145,122 +137,20 @@ router.post('/:id/linkedin-data', (req, res) => {
   res.json({ success: true, profile: profileData });
 });
 
-// POST scan LinkedIn profile (server-side with improved headers)
-router.post('/:id/linkedin-scan', async (req, res) => {
+// POST queue contact for LinkedIn scan
+router.post('/:id/scan-request', (req, res) => {
   const db = getDb();
   const contact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(req.params.id);
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-  const linkedinUrl = req.body.linkedin_url || contact.linkedin_url;
-  if (!linkedinUrl) return res.status(400).json({ error: 'No LinkedIn URL provided' });
+  const linkedin_url = req.body.linkedin_url || contact.linkedin_url;
+  if (!linkedin_url) return res.status(400).json({ error: 'No LinkedIn URL provided. Add a LinkedIn URL first.' });
 
-  try {
-    const profileData = await scrapeLinkedInProfile(linkedinUrl);
+  db.prepare(`UPDATE contacts SET linkedin_url=?, linkedin_scan_status='pending', updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(linkedin_url, req.params.id);
 
-    db.prepare(`
-      UPDATE contacts SET linkedin_url=?, linkedin_data=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-    `).run(linkedinUrl, JSON.stringify(profileData), req.params.id);
-
-    res.json({ success: true, profile: profileData, requires_browser: !!profileData.requires_browser });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to scan LinkedIn profile', details: err.message });
-  }
+  res.json({ success: true, message: 'Scan queued. Ask Claude in your Cowork chat to process pending LinkedIn scans.' });
 });
-
-async function scrapeLinkedInProfile(url) {
-  const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-
-  const attempts = [
-    {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'Upgrade-Insecure-Requests': '1',
-    },
-    {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-GB,en;q=0.8',
-    },
-  ];
-
-  for (const headers of attempts) {
-    try {
-      const response = await axios.get(cleanUrl, {
-        headers,
-        timeout: 12000,
-        maxRedirects: 3,
-        validateStatus: (s) => s < 500,
-      });
-
-      if (response.status === 999 || response.status === 429) continue;
-
-      const html = response.data;
-      if (typeof html !== 'string' || html.length < 200) continue;
-
-      if (html.includes('authwall') || html.includes('login?session_redirect') || html.includes('Sign in to LinkedIn')) {
-        return {
-          url: cleanUrl,
-          requires_browser: true,
-          scraped_at: new Date().toISOString(),
-          note: 'LinkedIn requires browser-based import. Use the bookmarklet in Settings to scan this profile.',
-        };
-      }
-
-      const $ = cheerio.load(html);
-      const profile = { url: cleanUrl };
-
-      profile.name = ($('meta[property="og:title"]').attr('content') || '').replace(/\s*[\|\u2013-]\s*(LinkedIn|.*LinkedIn.*)$/i, '').trim();
-      profile.description = $('meta[property="og:description"]').attr('content') || '';
-      profile.image = $('meta[property="og:image"]').attr('content') || '';
-
-      $('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          const data = JSON.parse($(el).html());
-          if (data['@type'] === 'Person') {
-            if (!profile.name && data.name) profile.name = data.name;
-            if (data.jobTitle) profile.headline = data.jobTitle;
-            if (data.worksFor?.name) profile.company = data.worksFor.name;
-            if (data.address?.addressLocality) profile.location = data.address.addressLocality;
-          }
-        } catch (_) {}
-      });
-
-      if (profile.name) {
-        const parts = profile.name.split(' ');
-        profile.first_name = parts[0] || '';
-        profile.last_name = parts.slice(1).join(' ') || '';
-      }
-
-      if (profile.description && !profile.headline) {
-        const descParts = profile.description.split(/ at | @ /);
-        if (descParts.length >= 2) {
-          profile.headline = descParts[0].trim();
-          profile.company = profile.company || descParts[1].split(/[.,]/)[0].trim();
-        } else {
-          profile.headline = profile.description.split(/[.\u00b7]/)[0].trim();
-        }
-      }
-
-      profile.scraped_at = new Date().toISOString();
-      profile.source = 'linkedin_public';
-
-      if (profile.name || profile.headline) return profile;
-    } catch (err) {
-      if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') continue;
-      throw err;
-    }
-  }
-
-  return {
-    url: cleanUrl,
-    requires_browser: true,
-    scraped_at: new Date().toISOString(),
-    note: 'LinkedIn blocked server-side access. Use the bookmarklet in Settings to scan directly from your browser.',
-  };
-}
 
 // DELETE contact
 router.delete('/:id', (req, res) => {
