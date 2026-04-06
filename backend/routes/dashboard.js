@@ -1,52 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../database');
+const supabase = require('../lib/supabase');
 
-router.get('/stats', (req, res) => {
-  const db = getDb();
-
-  const totalLeads = db.prepare("SELECT COUNT(*) as count FROM leads WHERE status != 'converted'").get().count;
-  const totalContacts = db.prepare('SELECT COUNT(*) as count FROM contacts').get().count;
-  const totalAccounts = db.prepare('SELECT COUNT(*) as count FROM accounts').get().count;
-  const openDeals = db.prepare("SELECT COUNT(*) as count FROM deals WHERE stage NOT IN ('closed_won','closed_lost')").get().count;
-  const pipelineValue = db.prepare("SELECT COALESCE(SUM(value), 0) as total FROM deals WHERE stage NOT IN ('closed_won','closed_lost')").get().total;
-  const wonValue = db.prepare("SELECT COALESCE(SUM(value), 0) as total FROM deals WHERE stage = 'closed_won'").get().total;
-  const overdueActivities = db.prepare("SELECT COUNT(*) as count FROM activities WHERE completed = 0 AND due_date < date('now')").get().count;
-  const newLeadsThisWeek = db.prepare("SELECT COUNT(*) as count FROM leads WHERE created_at >= date('now', '-7 days')").get().count;
-
-  const stageBreakdown = db.prepare(`
-    SELECT stage, COUNT(*) as count, COALESCE(SUM(value), 0) as value
-    FROM deals GROUP BY stage
-  `).all();
-
-  const recentActivity = db.prepare(`
-    SELECT a.*, d.name as deal_name, c.first_name || ' ' || c.last_name as contact_name
-    FROM activities a
-    LEFT JOIN deals d ON a.deal_id = d.id
-    LEFT JOIN contacts c ON a.contact_id = c.id
-    ORDER BY a.created_at DESC LIMIT 5
-  `).all();
-
-  const topDeals = db.prepare(`
-    SELECT d.*, a.name as account_name
-    FROM deals d LEFT JOIN accounts a ON d.account_id = a.id
-    WHERE d.stage NOT IN ('closed_won','closed_lost')
-    ORDER BY d.value DESC LIMIT 5
-  `).all();
-
-  res.json({
-    totalLeads,
-    totalContacts,
-    totalAccounts,
-    openDeals,
-    pipelineValue,
-    wonValue,
-    overdueActivities,
-    newLeadsThisWeek,
-    stageBreakdown,
-    recentActivity,
-    topDeals,
-  });
+router.get('/stats', async (req, res) => {
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const today   = new Date().toISOString().split('T')[0];
+    const [leadsR,contactsR,accountsR,openDealsR,pipelineR,wonR,overdueR,newLeadsR,stageR,recentR,topDealsR] = await Promise.all([
+      supabase.from('leads').select('id',{count:'exact',head:true}).neq('status','converted'),
+      supabase.from('contacts').select('id',{count:'exact',head:true}),
+      supabase.from('accounts').select('id',{count:'exact',head:true}),
+      supabase.from('deals').select('id',{count:'exact',head:true}).not('stage','in','("closed_won","closed_lost")'),
+      supabase.from('deals').select('value').not('stage','in','("closed_won","closed_lost")'),
+      supabase.from('deals').select('value').eq('stage','closed_won'),
+      supabase.from('activities').select('id',{count:'exact',head:true}).eq('completed',0).lt('due_date',today),
+      supabase.from('leads').select('id',{count:'exact',head:true}).gte('created_at',weekAgo),
+      supabase.from('deals').select('stage,value'),
+      supabase.from('activities').select('*,deals(name),contacts(first_name,last_name)').order('created_at',{ascending:false}).limit(5),
+      supabase.from('deals').select('*,accounts(name)').not('stage','in','("closed_won","closed_lost")').order('value',{ascending:false}).limit(5),
+    ]);
+    const pipelineValue=(pipelineR.data||[]).reduce((s,d)=>s+(Number(d.value)||0),0);
+    const wonValue=(wonR.data||[]).reduce((s,d)=>s+(Number(d.value)||0),0);
+    const stageMap={};
+    (stageR.data||[]).forEach(d=>{if(!stageMap[d.stage])stageMap[d.stage]={stage:d.stage,count:0,value:0};stageMap[d.stage].count++;stageMap[d.stage].value+=Number(d.value)||0;});
+    res.json({
+      totalLeads:leadsR.count||0,totalContacts:contactsR.count||0,totalAccounts:accountsR.count||0,
+      openDeals:openDealsR.count||0,pipelineValue,wonValue,
+      overdueActivities:overdueR.count||0,newLeadsThisWeek:newLeadsR.count||0,
+      stageBreakdown:Object.values(stageMap),
+      recentActivity:(recentR.data||[]).map(a=>({...a,deal_name:a.deals?.name||null,contact_name:a.contacts?`${a.contacts.first_name} ${a.contacts.last_name}`:null,deals:undefined,contacts:undefined})),
+      topDeals:(topDealsR.data||[]).map(d=>({...d,account_name:d.accounts?.name||null,accounts:undefined})),
+    });
+  } catch(e){res.status(500).json({error:e.message});}
 });
 
 module.exports = router;
