@@ -1,43 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../database');
+const supabase = require('../lib/supabase');
 
-// GET all pending or recent LinkedIn scans (for Claude to process)
-router.get('/', (req, res) => {
-  const db = getDb();
-  const status = req.query.status || 'pending';
-
-  const leads = db.prepare(
-    `SELECT id, 'lead' as type, first_name, last_name, company, title, linkedin_url, linkedin_scan_status, updated_at
-     FROM leads WHERE linkedin_scan_status = ? AND linkedin_url IS NOT NULL ORDER BY updated_at DESC`
-  ).all(status);
-
-  const contacts = db.prepare(
-    `SELECT id, 'contact' as type, first_name, last_name, title, linkedin_url, linkedin_scan_status, updated_at
-     FROM contacts WHERE linkedin_scan_status = ? AND linkedin_url IS NOT NULL ORDER BY updated_at DESC`
-  ).all(status);
-
-  const queue = [...leads, ...contacts].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-
-  res.json({
-    count: queue.length,
-    items: queue.map(item => ({
-      ...item,
-      name: `${item.first_name} ${item.last_name}`.trim(),
-      save_url: item.type === 'lead'
-        ? `/api/leads/${item.id}/linkedin-data`
-        : `/api/contacts/${item.id}/linkedin-data`,
-    }))
-  });
+router.get('/', async (req, res) => {
+  try {
+    const status = req.query.status || 'pending';
+    const [leadsR, contactsR] = await Promise.all([
+      supabase.from('leads').select('id,first_name,last_name,company,title,linkedin_url,linkedin_scan_status,updated_at')
+        .eq('linkedin_scan_status', status).not('linkedin_url', 'is', null),
+      supabase.from('contacts').select('id,first_name,last_name,title,linkedin_url,linkedin_scan_status,updated_at')
+        .eq('linkedin_scan_status', status).not('linkedin_url', 'is', null),
+    ]);
+    const leads    = (leadsR.data    || []).map(r => ({ ...r, type: 'lead',    name: `${r.first_name} ${r.last_name}`.trim(), save_url: `/api/leads/${r.id}/linkedin-data` }));
+    const contacts = (contactsR.data || []).map(r => ({ ...r, type: 'contact', name: `${r.first_name} ${r.last_name}`.trim(), save_url: `/api/contacts/${r.id}/linkedin-data` }));
+    const queue = [...leads, ...contacts].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+    res.json({ count: queue.length, items: queue });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST mark a scan as failed
-router.post('/:type/:id/fail', (req, res) => {
-  const db = getDb();
-  const { type, id } = req.params;
-  const table = type === 'lead' ? 'leads' : 'contacts';
-  db.prepare(`UPDATE ${table} SET linkedin_scan_status='failed', updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(id);
-  res.json({ success: true });
+router.post('/:type/:id/fail', async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    if (!['lead', 'contact'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+    const table = type === 'lead' ? 'leads' : 'contacts';
+    const { error } = await supabase.from(table).update({
+      linkedin_scan_status: 'failed', updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
