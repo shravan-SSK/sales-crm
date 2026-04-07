@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { gmailApi } from '../api'
-import { Mail, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Copy, Check, BookMarked } from 'lucide-react'
+import api from '../api'
+import { Mail, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Copy, Check, BookMarked, Kanban, Plus, Trash2, GripVertical, Save } from 'lucide-react'
 
 // Build the LinkedIn bookmarklet JS
-// When user clicks it on a LinkedIn profile page, it opens the CRM Leads page with pre-filled data
 function buildBookmarklet(crmUrl) {
   const fn = `(function(){
   try{
@@ -17,10 +17,141 @@ function buildBookmarklet(crmUrl) {
     var c=document.querySelector('.pv-text-details__right-panel .hoverable-link-text,.top-card-layout__first-subline');
     var company=c?c.innerText.trim().split('\\n')[0]:'';
     var params=new URLSearchParams({import:'1',name:name,title:headline,company:company,linkedin_url:u});
-    window.open('${crmUrl}/leads?'+params.toString(),'_blank');
+    window.open('${crmUrl}/deals?'+params.toString(),'_blank');
   }catch(e){alert('Could not extract profile data. Please try again on a LinkedIn profile page.');}
   })()`;
   return 'javascript:' + fn.replace(/\s+/g, ' ');
+}
+
+const DEFAULT_STAGES = [
+  'Prospecting',
+  'Qualification',
+  'Proposal',
+  'Negotiation',
+  'Closed Won',
+  'Closed Lost',
+]
+
+function PipelineStagesSection() {
+  const qc = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [newStage, setNewStage] = useState('')
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get('/settings').then(r => r.data),
+  })
+
+  // Parse stages from settings or use defaults
+  const rawStages = settings?.pipeline_stages
+  let stages = DEFAULT_STAGES
+  try {
+    if (rawStages) stages = JSON.parse(rawStages)
+  } catch {}
+
+  const [localStages, setLocalStages] = useState(null)
+  const displayStages = localStages !== null ? localStages : stages
+
+  // Sync localStages when settings load
+  if (localStages === null && rawStages !== undefined && !isLoading) {
+    try {
+      setLocalStages(rawStages ? JSON.parse(rawStages) : DEFAULT_STAGES)
+    } catch { setLocalStages(DEFAULT_STAGES) }
+  }
+
+  const saveStages = async () => {
+    setSaving(true)
+    try {
+      await api.put('/settings', { pipeline_stages: JSON.stringify(displayStages) })
+      qc.invalidateQueries(['settings'])
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {}
+    setSaving(false)
+  }
+
+  const addStage = () => {
+    const s = newStage.trim()
+    if (!s || displayStages.includes(s)) return
+    setLocalStages([...displayStages, s])
+    setNewStage('')
+  }
+
+  const removeStage = (i) => {
+    const next = [...displayStages]
+    next.splice(i, 1)
+    setLocalStages(next)
+  }
+
+  const moveStage = (i, dir) => {
+    const next = [...displayStages]
+    const j = i + dir
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setLocalStages(next)
+  }
+
+  const resetToDefault = () => setLocalStages([...DEFAULT_STAGES])
+
+  if (isLoading) return <div className="text-sm text-gray-400 py-4">Loading stages...</div>
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Define and order the stages for your pipeline. Changes here update the pipeline board column order.
+      </p>
+
+      <div className="space-y-2">
+        {displayStages.map((stage, i) => (
+          <div key={i} className="flex items-center gap-2 group">
+            <div className="flex flex-col gap-0.5">
+              <button onClick={() => moveStage(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none text-xs">▲</button>
+              <button onClick={() => moveStage(i, 1)} disabled={i === displayStages.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-20 leading-none text-xs">▼</button>
+            </div>
+            <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-medium flex-shrink-0">{i + 1}</span>
+              <input
+                className="flex-1 text-sm bg-transparent border-none outline-none"
+                value={stage}
+                onChange={e => {
+                  const next = [...displayStages]
+                  next[i] = e.target.value
+                  setLocalStages(next)
+                }}
+              />
+            </div>
+            <button onClick={() => removeStage(i)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          className="input flex-1"
+          placeholder="Add new stage..."
+          value={newStage}
+          onChange={e => setNewStage(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addStage()}
+        />
+        <button onClick={addStage} disabled={!newStage.trim()} className="btn-secondary flex items-center gap-1.5">
+          <Plus size={14} /> Add
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button onClick={saveStages} disabled={saving} className="btn-primary flex items-center gap-2">
+          <Save size={14} />
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Stages'}
+        </button>
+        <button onClick={resetToDefault} className="text-sm text-gray-400 hover:text-gray-600">
+          Reset to defaults
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function Settings() {
@@ -87,6 +218,20 @@ export default function Settings() {
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-sm text-gray-500">Configure integrations and preferences</p>
+      </div>
+
+      {/* Pipeline Stage Management */}
+      <div className="card p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+            <Kanban size={20} className="text-blue-500" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Pipeline Stages</h2>
+            <p className="text-sm text-gray-500">Manage and reorder your deal pipeline stages</p>
+          </div>
+        </div>
+        <PipelineStagesSection />
       </div>
 
       {/* Gmail Integration */}
@@ -178,24 +323,23 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="font-semibold">LinkedIn Browser Scanner</h2>
-            <p className="text-sm text-gray-500">Import leads directly from LinkedIn profiles — no API required</p>
+            <p className="text-sm text-gray-500">Import deals directly from LinkedIn profiles — no API required</p>
           </div>
         </div>
 
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mb-4">
           <h3 className="text-sm font-semibold text-indigo-900 mb-1">How it works</h3>
           <p className="text-xs text-indigo-700 mb-3">
-            Install the bookmarklet below in your browser. When you visit any LinkedIn profile, click it and the lead will be imported directly into your CRM — using <strong>your own browser session</strong>, with no external APIs.
+            Install the bookmarklet below in your browser. When you visit any LinkedIn profile, click it and the deal will be imported directly into your CRM — using <strong>your own browser session</strong>, with no external APIs.
           </p>
           <ol className="text-xs text-indigo-700 space-y-1.5 list-decimal list-inside">
             <li>Drag the button below to your browser bookmarks bar, <em>or</em> copy the code and create a bookmark manually.</li>
             <li>Navigate to any LinkedIn profile in your browser (you must be logged in to LinkedIn).</li>
-            <li>Click the bookmarklet — it will open the Add Lead form in your CRM with the profile pre-filled.</li>
-            <li>Review the data and click <strong>Save Lead</strong>.</li>
+            <li>Click the bookmarklet — it will open the Add Deal form in your CRM with the profile pre-filled.</li>
+            <li>Review the data and click <strong>Save Deal</strong>.</li>
           </ol>
         </div>
 
-        {/* Drag-to-bookmarks bar button */}
         <div className="flex items-center gap-3 mb-3">
           <a
             href={bookmarklet}
@@ -219,13 +363,13 @@ export default function Settings() {
             {bookmarkletCopied ? 'Copied!' : 'Copy bookmarklet code'}
           </button>
           <span className="text-xs text-gray-400">
-            Paste as the URL of a new bookmark if drag-drop does not work.
+            Paste as the URL of a new bookmark if drag-drop doesn't work.
           </span>
         </div>
 
         <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-700">
-          <strong>Tip:</strong> The bookmarklet reads name, title/headline, and company from the LinkedIn page.
-          It works best when you are logged in to LinkedIn. All data is editable before saving.
+          <strong>Tip:</strong> The bookmarklet reads name, title/headline, and company from the LinkedIn page DOM.
+          It works best when you're logged in to LinkedIn. All data is editable before saving.
         </div>
       </div>
 
@@ -233,9 +377,9 @@ export default function Settings() {
       <div className="card p-6">
         <h2 className="font-semibold mb-3">About</h2>
         <div className="text-sm text-gray-600 space-y-1">
-          <p>Sales CRM v1.0</p>
-          <p>Built with React + Node.js + SQLite</p>
-          <p className="text-gray-400 text-xs mt-2">Database stored at: <code>backend/crm.db</code></p>
+          <p className="font-medium">STC Sales Engine v1.0</p>
+          <p className="text-gray-500">Built for Seventh Triangle by Claude</p>
+          <p className="text-gray-400 text-xs mt-2">Powered by React + Node.js + Supabase (PostgreSQL)</p>
         </div>
       </div>
     </div>
