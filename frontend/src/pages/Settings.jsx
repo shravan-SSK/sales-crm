@@ -6,26 +6,14 @@ import { Mail, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Copy, Check, 
 
 // Build the LinkedIn bookmarklet JS
 function buildBookmarklet(crmUrl) {
-  const fn = `(function(){
-  try{
-    var u=window.location.href;
-    if(!u.includes('linkedin.com/in/')){alert('Please navigate to a LinkedIn profile page first.');return;}
-    var n=document.querySelector('h1')||document.querySelector('.top-card-layout__title');
-    var name=n?n.innerText.trim():'';
-    var h=document.querySelector('.text-body-medium,.top-card-layout__headline,.pv-text-details__left-panel h2');
-    var headline=h?h.innerText.trim().split('\\n')[0]:'';
-    var c=document.querySelector('.pv-text-details__right-panel .hoverable-link-text,.top-card-layout__first-subline');
-    var company=c?c.innerText.trim().split('\\n')[0]:'';
-    var params=new URLSearchParams({import:'1',name:name,title:headline,company:company,linkedin_url:u});
-    window.open('${crmUrl}/deals?'+params.toString(),'_blank');
-  }catch(e){alert('Could not extract profile data. Please try again on a LinkedIn profile page.');}
-  })()`;
+  const fn = `(function(){ try{ var u=window.location.href; if(!u.includes('linkedin.com/in/')){alert('Please navigate to a LinkedIn profile page first.');return;} var n=document.querySelector('h1')||document.querySelector('.top-card-layout__title'); var name=n?n.innerText.trim():''; var h=document.querySelector('.text-body-medium,.top-card-layout__headline,.pv-text-details__left-panel h2'); var headline=h?h.innerText.trim().split('\\n')[0]:''; var c=document.querySelector('.pv-text-details__right-panel .hoverable-link-text,.top-card-layout__first-subline'); var company=c?c.innerText.trim().split('\\n')[0]:''; var params=new URLSearchParams({import:'1',name:name,title:headline,company:company,linkedin_url:u}); window.open('${crmUrl}/deals?'+params.toString(),'_blank'); }catch(e){alert('Could not extract profile data. Please try again on a LinkedIn profile page.');} })()`;
   return 'javascript:' + fn.replace(/\s+/g, ' ');
 }
 
+// Aligned with Pipeline.jsx stage slugs: lead, qualified, proposal, negotiation, closed_won, closed_lost
 const DEFAULT_STAGES = [
-  'Prospecting',
-  'Qualification',
+  'Lead',
+  'Qualified',
   'Proposal',
   'Negotiation',
   'Closed Won',
@@ -46,18 +34,14 @@ function PipelineStagesSection() {
   // Parse stages from settings or use defaults
   const rawStages = settings?.pipeline_stages
   let stages = DEFAULT_STAGES
-  try {
-    if (rawStages) stages = JSON.parse(rawStages)
-  } catch {}
+  try { if (rawStages) stages = JSON.parse(rawStages) } catch {}
 
   const [localStages, setLocalStages] = useState(null)
   const displayStages = localStages !== null ? localStages : stages
 
   // Sync localStages when settings load
   if (localStages === null && rawStages !== undefined && !isLoading) {
-    try {
-      setLocalStages(rawStages ? JSON.parse(rawStages) : DEFAULT_STAGES)
-    } catch { setLocalStages(DEFAULT_STAGES) }
+    try { setLocalStages(rawStages ? JSON.parse(rawStages) : DEFAULT_STAGES) } catch { setLocalStages(DEFAULT_STAGES) }
   }
 
   const saveStages = async () => {
@@ -101,7 +85,6 @@ function PipelineStagesSection() {
       <p className="text-sm text-gray-600">
         Define and order the stages for your pipeline. Changes here update the pipeline board column order.
       </p>
-
       <div className="space-y-2">
         {displayStages.map((stage, i) => (
           <div key={i} className="flex items-center gap-2 group">
@@ -114,11 +97,7 @@ function PipelineStagesSection() {
               <input
                 className="flex-1 text-sm bg-transparent border-none outline-none"
                 value={stage}
-                onChange={e => {
-                  const next = [...displayStages]
-                  next[i] = e.target.value
-                  setLocalStages(next)
-                }}
+                onChange={e => { const next = [...displayStages]; next[i] = e.target.value; setLocalStages(next) }}
               />
             </div>
             <button onClick={() => removeStage(i)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -127,7 +106,6 @@ function PipelineStagesSection() {
           </div>
         ))}
       </div>
-
       <div className="flex gap-2">
         <input
           className="input flex-1"
@@ -140,15 +118,11 @@ function PipelineStagesSection() {
           <Plus size={14} /> Add
         </button>
       </div>
-
       <div className="flex items-center gap-3">
         <button onClick={saveStages} disabled={saving} className="btn-primary flex items-center gap-2">
-          <Save size={14} />
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Stages'}
+          <Save size={14} /> {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Stages'}
         </button>
-        <button onClick={resetToDefault} className="text-sm text-gray-400 hover:text-gray-600">
-          Reset to defaults
-        </button>
+        <button onClick={resetToDefault} className="text-sm text-gray-400 hover:text-gray-600">Reset to defaults</button>
       </div>
     </div>
   )
@@ -157,7 +131,6 @@ function PipelineStagesSection() {
 export default function Settings() {
   const qc = useQueryClient()
   const { data: status, refetch: refetchStatus } = useQuery({ queryKey: ['gmail-status'], queryFn: gmailApi.getStatus })
-
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const [saving, setSaving] = useState(false)
@@ -186,12 +159,7 @@ export default function Settings() {
       const { url } = await gmailApi.getAuthUrl()
       const popup = window.open(url, '_blank', 'width=500,height=600')
       const interval = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(interval)
-          refetchStatus()
-          qc.invalidateQueries(['gmail-status'])
-          setAuthLoading(false)
-        }
+        if (popup.closed) { clearInterval(interval); refetchStatus(); qc.invalidateQueries(['gmail-status']); setAuthLoading(false) }
       }, 500)
     } catch (e) {
       setMessage({ type: 'error', text: e.response?.data?.error || e.message })
@@ -246,26 +214,19 @@ export default function Settings() {
           </div>
           <div className="ml-auto">
             {status?.connected ? (
-              <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                <CheckCircle2 size={16} /> Connected
-              </span>
+              <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium"><CheckCircle2 size={16} /> Connected</span>
             ) : (
-              <span className="flex items-center gap-1.5 text-sm text-gray-400">
-                <XCircle size={16} /> Not connected
-              </span>
+              <span className="flex items-center gap-1.5 text-sm text-gray-400"><XCircle size={16} /> Not connected</span>
             )}
           </div>
         </div>
-
         {status?.connected ? (
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <p className="text-sm text-green-700">Connected as <strong>{status.email}</strong></p>
               <p className="text-xs text-green-600 mt-1">Go to Email Inbox to sync messages and auto-create leads.</p>
             </div>
-            <button onClick={disconnect} className="btn-secondary text-red-600 border-red-300 hover:bg-red-50">
-              Disconnect Gmail
-            </button>
+            <button onClick={disconnect} className="btn-secondary text-red-600 border-red-300 hover:bg-red-50">Disconnect Gmail</button>
           </div>
         ) : (
           <div className="space-y-5">
@@ -280,7 +241,6 @@ export default function Settings() {
                 <li>Copy Client ID and Client Secret below</li>
               </ol>
             </div>
-
             {!status?.configured && (
               <div className="space-y-4">
                 <div>
@@ -296,16 +256,13 @@ export default function Settings() {
                 </button>
               </div>
             )}
-
             {status?.configured && (
               <button onClick={connectGmail} disabled={authLoading} className="btn-primary flex items-center gap-2">
-                <Mail size={16} />
-                {authLoading ? 'Opening auth window...' : 'Connect Gmail'}
+                <Mail size={16} /> {authLoading ? 'Opening auth window...' : 'Connect Gmail'}
               </button>
             )}
           </div>
         )}
-
         {message && (
           <div className={`mt-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
             {message.text}
@@ -326,7 +283,6 @@ export default function Settings() {
             <p className="text-sm text-gray-500">Import deals directly from LinkedIn profiles — no API required</p>
           </div>
         </div>
-
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mb-4">
           <h3 className="text-sm font-semibold text-indigo-900 mb-1">How it works</h3>
           <p className="text-xs text-indigo-700 mb-3">
@@ -339,7 +295,6 @@ export default function Settings() {
             <li>Review the data and click <strong>Save Deal</strong>.</li>
           </ol>
         </div>
-
         <div className="flex items-center gap-3 mb-3">
           <a
             href={bookmarklet}
@@ -348,12 +303,10 @@ export default function Settings() {
             onClick={e => { e.preventDefault(); alert('Drag this button to your bookmarks bar to install it.') }}
             draggable="true"
           >
-            <BookMarked size={15} />
-            Import to CRM
+            <BookMarked size={15} /> Import to CRM
           </a>
           <span className="text-xs text-gray-400">← drag this to your bookmarks bar</span>
         </div>
-
         <div className="flex items-center gap-2">
           <button
             onClick={copyBookmarklet}
@@ -362,14 +315,10 @@ export default function Settings() {
             {bookmarkletCopied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
             {bookmarkletCopied ? 'Copied!' : 'Copy bookmarklet code'}
           </button>
-          <span className="text-xs text-gray-400">
-            Paste as the URL of a new bookmark if drag-drop doesn't work.
-          </span>
+          <span className="text-xs text-gray-400">Paste as the URL of a new bookmark if drag-drop doesn't work.</span>
         </div>
-
         <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-700">
-          <strong>Tip:</strong> The bookmarklet reads name, title/headline, and company from the LinkedIn page DOM.
-          It works best when you're logged in to LinkedIn. All data is editable before saving.
+          <strong>Tip:</strong> The bookmarklet reads name, title/headline, and company from the LinkedIn page DOM. It works best when you're logged in to LinkedIn. All data is editable before saving.
         </div>
       </div>
 

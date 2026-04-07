@@ -1,36 +1,49 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { dealsApi, accountsApi, contactsApi } from '../api'
+import api from '../api'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { Plus, DollarSign, Calendar, Users, TrendingUp, BarChart2 } from 'lucide-react'
 import Modal from '../components/Modal'
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
-} from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts'
 
-const STAGES = ['lead', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost']
-const STAGE_CONFIG = {
-  lead:        { label: 'Lead',        color: 'bg-gray-100',   header: 'bg-gray-200',  text: 'text-gray-700',   dot: 'bg-gray-400' },
-  qualified:   { label: 'Qualified',   color: 'bg-blue-50',    header: 'bg-blue-100',  text: 'text-blue-700',   dot: 'bg-blue-500' },
-  proposal:    { label: 'Proposal',    color: 'bg-yellow-50',  header: 'bg-yellow-100',text: 'text-yellow-700', dot: 'bg-yellow-500' },
-  negotiation: { label: 'Negotiation', color: 'bg-orange-50',  header: 'bg-orange-100',text: 'text-orange-700', dot: 'bg-orange-500' },
-  closed_won:  { label: 'Closed Won',  color: 'bg-green-50',   header: 'bg-green-100', text: 'text-green-700',  dot: 'bg-green-500' },
-  closed_lost: { label: 'Closed Lost', color: 'bg-red-50',     header: 'bg-red-100',   text: 'text-red-700',    dot: 'bg-red-500' },
+// Color palette cycled for dynamic stages
+const STAGE_COLORS = [
+  { color: 'bg-gray-100',   header: 'bg-gray-200',   text: 'text-gray-700',   dot: 'bg-gray-400' },
+  { color: 'bg-blue-50',    header: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500' },
+  { color: 'bg-yellow-50',  header: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500' },
+  { color: 'bg-orange-50',  header: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+  { color: 'bg-green-50',   header: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500' },
+  { color: 'bg-red-50',     header: 'bg-red-100',    text: 'text-red-700',    dot: 'bg-red-500' },
+  { color: 'bg-purple-50',  header: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
+  { color: 'bg-pink-50',    header: 'bg-pink-100',   text: 'text-pink-700',   dot: 'bg-pink-500' },
+]
+
+const DEFAULT_STAGE_LABELS = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost']
+
+function toSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
 }
 
-function DealForm({ initial = {}, accounts = [], contacts = [], onSubmit, onCancel, isLoading }) {
+function buildStageConfig(labels) {
+  return labels.reduce((acc, name, i) => {
+    acc[toSlug(name)] = { label: name, ...STAGE_COLORS[i % STAGE_COLORS.length] }
+    return acc
+  }, {})
+}
+
+function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], stageConfig = {}, onSubmit, onCancel, isLoading }) {
   const [form, setForm] = useState({
     name: initial.name || '',
     account_id: initial.account_id || '',
     contact_id: initial.contact_id || '',
-    stage: initial.stage || 'lead',
+    stage: initial.stage || (stages[0] || 'lead'),
     value: initial.value || '',
     probability: initial.probability || '',
     close_date: initial.close_date || '',
     notes: initial.notes || '',
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
   return (
     <form onSubmit={e => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
       <div><label className="label">Deal Name *</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} required /></div>
@@ -51,7 +64,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], onSubmit, onCanc
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Stage</label>
           <select className="input" value={form.stage} onChange={e => set('stage', e.target.value)}>
-            {STAGES.map(s => <option key={s} value={s}>{STAGE_CONFIG[s].label}</option>)}
+            {stages.map(s => <option key={s} value={s}>{stageConfig[s]?.label || s}</option>)}
           </select>
         </div>
         <div><label className="label">Deal Value ($)</label>
@@ -75,16 +88,14 @@ function DealForm({ initial = {}, accounts = [], contacts = [], onSubmit, onCanc
   )
 }
 
-function DealCard({ deal, index, onClick }) {
-  const cfg = STAGE_CONFIG[deal.stage] || STAGE_CONFIG.lead
+function DealCard({ deal, index, stageConfig, onClick }) {
+  const cfg = stageConfig[deal.stage] || STAGE_COLORS[0]
   const isOverdue = deal.close_date && new Date(deal.close_date) < new Date() && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost'
   return (
     <Draggable draggableId={deal.id} index={index}>
       {(provided, snapshot) => (
         <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
           onClick={onClick}
           className={`bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:shadow-md transition-shadow mb-2 ${snapshot.isDragging ? 'shadow-lg rotate-1' : ''}`}
         >
@@ -96,14 +107,12 @@ function DealCard({ deal, index, onClick }) {
           </div>
           {deal.close_date && (
             <div className={`flex items-center gap-1 mt-1 text-xs ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
-              <Calendar size={10} />
-              {deal.close_date}
+              <Calendar size={10} /> {deal.close_date}
             </div>
           )}
           {deal.stakeholders?.length > 0 && (
             <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
-              <Users size={10} />
-              {deal.stakeholders.length} stakeholder{deal.stakeholders.length !== 1 ? 's' : ''}
+              <Users size={10} /> {deal.stakeholders.length} stakeholder{deal.stakeholders.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -114,20 +123,12 @@ function DealCard({ deal, index, onClick }) {
 
 function StakeholderManager({ deal, contacts, onClose }) {
   const qc = useQueryClient()
-  const addMut = useMutation({
-    mutationFn: ({ contact_id, role }) => dealsApi.addStakeholder(deal.id, contact_id, role),
-    onSuccess: () => qc.invalidateQueries(['pipeline'])
-  })
-  const removeMut = useMutation({
-    mutationFn: (contact_id) => dealsApi.removeStakeholder(deal.id, contact_id),
-    onSuccess: () => qc.invalidateQueries(['pipeline'])
-  })
-
+  const addMut = useMutation({ mutationFn: ({ contact_id, role }) => dealsApi.addStakeholder(deal.id, contact_id, role), onSuccess: () => qc.invalidateQueries(['pipeline']) })
+  const removeMut = useMutation({ mutationFn: (contact_id) => dealsApi.removeStakeholder(deal.id, contact_id), onSuccess: () => qc.invalidateQueries(['pipeline']) })
   const [selectedContact, setSelectedContact] = useState('')
   const [role, setRole] = useState('')
   const stakeholderIds = deal.stakeholders?.map(s => s.contact_id) || []
   const availableContacts = contacts.filter(c => !stakeholderIds.includes(c.id))
-
   return (
     <div className="space-y-4">
       <div>
@@ -157,12 +158,10 @@ function StakeholderManager({ deal, contacts, onClose }) {
           </select>
           <input className="input" placeholder="Role (e.g. Decision Maker, Champion)" value={role} onChange={e => setRole(e.target.value)} />
           <button
-            onClick={() => { if(selectedContact) { addMut.mutate({ contact_id: selectedContact, role }); setSelectedContact(''); setRole('') } }}
+            onClick={() => { if (selectedContact) { addMut.mutate({ contact_id: selectedContact, role }); setSelectedContact(''); setRole('') } }}
             disabled={!selectedContact || addMut.isPending}
             className="btn-primary w-full"
-          >
-            Add Stakeholder
-          </button>
+          >Add Stakeholder</button>
         </div>
       </div>
     </div>
@@ -170,48 +169,55 @@ function StakeholderManager({ deal, contacts, onClose }) {
 }
 
 export default function Pipeline() {
-  const [view, setView] = useState('kanban') // kanban | forecast
+  const [view, setView] = useState('kanban')
   const [showModal, setShowModal] = useState(false)
   const [editingDeal, setEditingDeal] = useState(null)
   const [viewingDeal, setViewingDeal] = useState(null)
   const [stakeholderDeal, setStakeholderDeal] = useState(null)
   const qc = useQueryClient()
 
+  // Load pipeline stages from settings so Kanban matches Settings page
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get('/settings').then(r => r.data),
+  })
+
+  const stages = useMemo(() => {
+    try {
+      if (settingsData?.pipeline_stages) return JSON.parse(settingsData.pipeline_stages).map(toSlug)
+    } catch {}
+    return DEFAULT_STAGE_LABELS.map(toSlug)
+  }, [settingsData])
+
+  const stageConfig = useMemo(() => {
+    try {
+      if (settingsData?.pipeline_stages) return buildStageConfig(JSON.parse(settingsData.pipeline_stages))
+    } catch {}
+    return buildStageConfig(DEFAULT_STAGE_LABELS)
+  }, [settingsData])
+
   const { data: pipeline = {}, isLoading } = useQuery({
     queryKey: ['pipeline'],
     queryFn: dealsApi.getPipeline,
   })
-
   const { data: forecast = [] } = useQuery({
     queryKey: ['forecast'],
     queryFn: () => dealsApi.getForecast(6),
     enabled: view === 'forecast',
   })
-
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: () => accountsApi.getAll() })
   const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => contactsApi.getAll() })
 
-  const createMut = useMutation({
-    mutationFn: dealsApi.create,
-    onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']); setShowModal(false) }
-  })
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }) => dealsApi.update(id, data),
-    onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']); setEditingDeal(null) }
-  })
-  const deleteMut = useMutation({
-    mutationFn: dealsApi.delete,
-    onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']) }
-  })
+  const createMut = useMutation({ mutationFn: dealsApi.create, onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']); setShowModal(false) } })
+  const updateMut = useMutation({ mutationFn: ({ id, data }) => dealsApi.update(id, data), onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']); setEditingDeal(null) } })
+  const deleteMut = useMutation({ mutationFn: dealsApi.delete, onSuccess: () => { qc.invalidateQueries(['pipeline']); qc.invalidateQueries(['dashboard']) } })
 
   const onDragEnd = (result) => {
     if (!result.destination) return
-    const { draggableId, destination } = result
-    const newStage = destination.droppableId
-    updateMut.mutate({ id: draggableId, data: { stage: newStage } })
+    updateMut.mutate({ id: result.draggableId, data: { stage: result.destination.droppableId } })
   }
 
-  const totalPipeline = STAGES.filter(s => s !== 'closed_lost').reduce((sum, s) => {
+  const totalPipeline = stages.filter(s => s !== 'closed_lost').reduce((sum, s) => {
     return sum + (pipeline[s] || []).reduce((s2, d) => s2 + (d.value || 0), 0)
   }, 0)
 
@@ -224,16 +230,10 @@ export default function Pipeline() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-            <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm ${view === 'kanban' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-              Kanban
-            </button>
-            <button onClick={() => setView('forecast')} className={`px-3 py-1.5 text-sm ${view === 'forecast' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-              Forecast
-            </button>
+            <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm ${view === 'kanban' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Kanban</button>
+            <button onClick={() => setView('forecast')} className={`px-3 py-1.5 text-sm ${view === 'forecast' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Forecast</button>
           </div>
-          <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Add Deal
-          </button>
+          <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}><Plus size={16} /> Add Deal</button>
         </div>
       </div>
 
@@ -241,8 +241,8 @@ export default function Pipeline() {
         <div className="overflow-x-auto pb-4">
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex gap-3 min-w-max">
-              {STAGES.map(stage => {
-                const cfg = STAGE_CONFIG[stage]
+              {stages.map(stage => {
+                const cfg = stageConfig[stage] || STAGE_COLORS[0]
                 const stageDeals = pipeline[stage] || []
                 const stageTotal = stageDeals.reduce((s, d) => s + (d.value || 0), 0)
                 return (
@@ -260,17 +260,11 @@ export default function Pipeline() {
                     <Droppable droppableId={stage}>
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
+                          ref={provided.innerRef} {...provided.droppableProps}
                           className={`flex-1 min-h-48 p-2 rounded-b-lg border border-t-0 border-gray-200 ${snapshot.isDraggingOver ? 'bg-blue-50' : cfg.color}`}
                         >
                           {stageDeals.map((deal, index) => (
-                            <DealCard
-                              key={deal.id}
-                              deal={deal}
-                              index={index}
-                              onClick={() => setViewingDeal(deal)}
-                            />
+                            <DealCard key={deal.id} deal={deal} index={index} stageConfig={stageConfig} onClick={() => setViewingDeal(deal)} />
                           ))}
                           {provided.placeholder}
                           {stageDeals.length === 0 && !snapshot.isDraggingOver && (
@@ -288,15 +282,12 @@ export default function Pipeline() {
       ) : (
         <div className="space-y-6">
           <div className="card p-5">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp size={18} className="text-blue-600" />
-              Revenue Forecast (6 Months)
-            </h2>
+            <h2 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-blue-600" /> Revenue Forecast (6 Months)</h2>
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={forecast}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={v => `$${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v, name) => [`$${v.toLocaleString()}`, name]} />
                 <Legend />
                 <Area type="monotone" dataKey="committed" name="Committed" fill="#86efac" stroke="#22c55e" fillOpacity={0.6} />
@@ -306,10 +297,7 @@ export default function Pipeline() {
             </ResponsiveContainer>
           </div>
           <div className="card p-5">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <BarChart2 size={18} className="text-blue-600" />
-              Deals by Month
-            </h2>
+            <h2 className="font-semibold mb-4 flex items-center gap-2"><BarChart2 size={18} className="text-blue-600" /> Deals by Month</h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={forecast}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -349,12 +337,12 @@ export default function Pipeline() {
 
       {/* Add Deal Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Deal" size="lg">
-        <DealForm accounts={accounts} contacts={contacts} onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending} />
+        <DealForm accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending} />
       </Modal>
 
       {/* Edit Deal Modal */}
       <Modal isOpen={!!editingDeal} onClose={() => setEditingDeal(null)} title="Edit Deal" size="lg">
-        {editingDeal && <DealForm initial={editingDeal} accounts={accounts} contacts={contacts} onSubmit={data => updateMut.mutate({ id: editingDeal.id, data })} onCancel={() => setEditingDeal(null)} isLoading={updateMut.isPending} />}
+        {editingDeal && <DealForm initial={editingDeal} accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} onSubmit={data => updateMut.mutate({ id: editingDeal.id, data })} onCancel={() => setEditingDeal(null)} isLoading={updateMut.isPending} />}
       </Modal>
 
       {/* View Deal Modal */}
@@ -362,17 +350,11 @@ export default function Pipeline() {
         {viewingDeal && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              <div className="card p-3">
-                <p className="text-xs text-gray-500">Value</p>
-                <p className="text-xl font-bold text-green-600">${(viewingDeal.value || 0).toLocaleString()}</p>
-              </div>
-              <div className="card p-3">
-                <p className="text-xs text-gray-500">Probability</p>
-                <p className="text-xl font-bold">{viewingDeal.probability}%</p>
-              </div>
+              <div className="card p-3"><p className="text-xs text-gray-500">Value</p><p className="text-xl font-bold text-green-600">${(viewingDeal.value || 0).toLocaleString()}</p></div>
+              <div className="card p-3"><p className="text-xs text-gray-500">Probability</p><p className="text-xl font-bold">{viewingDeal.probability}%</p></div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-500">Stage:</span> <span className="font-medium">{STAGE_CONFIG[viewingDeal.stage]?.label}</span></div>
+              <div><span className="text-gray-500">Stage:</span> <span className="font-medium">{stageConfig[viewingDeal.stage]?.label || viewingDeal.stage}</span></div>
               <div><span className="text-gray-500">Account:</span> <span className="font-medium">{viewingDeal.account_name || '—'}</span></div>
               <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{viewingDeal.contact_name || '—'}</span></div>
               <div><span className="text-gray-500">Close Date:</span> <span className="font-medium">{viewingDeal.close_date || '—'}</span></div>
@@ -387,9 +369,7 @@ export default function Pipeline() {
                 <p className="text-sm text-gray-400">No stakeholders yet</p>
               ) : viewingDeal.stakeholders?.map(s => (
                 <div key={s.contact_id} className="flex items-center gap-2 py-1.5 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                    {s.first_name[0]}
-                  </div>
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{s.first_name[0]}</div>
                   <span>{s.first_name} {s.last_name}</span>
                   {s.role && <span className="text-gray-400">· {s.role}</span>}
                 </div>
@@ -397,7 +377,7 @@ export default function Pipeline() {
             </div>
             <div className="flex gap-2 pt-3 border-t">
               <button onClick={() => { setEditingDeal(viewingDeal); setViewingDeal(null) }} className="btn-secondary flex-1">Edit Deal</button>
-              <button onClick={() => { if(window.confirm('Delete deal?')) { deleteMut.mutate(viewingDeal.id); setViewingDeal(null) } }} className="btn-danger">Delete</button>
+              <button onClick={() => { if (window.confirm('Delete deal?')) { deleteMut.mutate(viewingDeal.id); setViewingDeal(null) } }} className="btn-danger">Delete</button>
             </div>
           </div>
         )}
