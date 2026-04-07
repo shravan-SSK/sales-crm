@@ -19,22 +19,6 @@ const nav = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-function STCLogo() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="stcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#60A5FA" />
-          <stop offset="100%" stopColor="#818CF8" />
-        </linearGradient>
-      </defs>
-      <polygon points="16,2 30,28 2,28" fill="url(#stcGrad)" />
-      <polygon points="16,10 24,26 8,26" fill="white" fillOpacity="0.2" />
-      <text x="16" y="25" textAnchor="middle" fill="white" fontSize="8" fontWeight="800"
-        fontFamily="system-ui,sans-serif" letterSpacing="0.5">ST</text>
-    </svg>
-  )
-}
 
 export default function Layout() {
   const [search, setSearch] = useState('')
@@ -70,7 +54,7 @@ export default function Layout() {
       <aside className="w-60 bg-gray-900 text-white flex flex-col">
         <div className="p-5 border-b border-gray-700">
           <div className="flex items-center gap-2.5">
-            <STCLogo />
+            <img src="/stc-logo.svg" alt="STC" className="h-8 w-8 object-contain" />
             <div>
               <span className="font-bold text-base leading-tight block">STC Sales Engine</span>
               <span className="text-xs text-gray-400 leading-tight">Seventh Triangle</span>
@@ -87,7 +71,7 @@ export default function Layout() {
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    : 'text-gray-300 hover:bo-gray-800 hover:text-white'
                 }`
               }
             >
@@ -136,7 +120,7 @@ export default function Layout() {
                   </button>
                 ))}
                 {searchResults.accounts?.map(a => (
-                   <button key={a.id} onClick={() => { navigate('/accounts'); setSearch(''); setSearchResults(null); }}
+                  <button key={a.id} onClick={() => { navigate('/accounts'); setSearch(''); setSearchResults(null); }}
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-sm border-b border-gray-100">
                     <Building2 size={14} className="text-green-500 flex-shrink-0" />
                     <div><div className="font-medium">{a.name}</div><div className="text-gray-500 text-xs">{a.industry} · Account</div></div>
