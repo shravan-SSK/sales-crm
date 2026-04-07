@@ -7,29 +7,34 @@ const app = express();
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:3000',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow no-origin (server-to-server), explicit whitelist, or any *.vercel.app preview URL
+    if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      return cb(null, true);
+    }
     cb(new Error(`CORS: ${origin} not allowed`));
   },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/leads',      require('./routes/leads'));
-app.use('/api/contacts',   require('./routes/contacts'));
-app.use('/api/accounts',   require('./routes/accounts'));
-app.use('/api/deals',      require('./routes/deals'));
-app.use('/api/activities', require('./routes/activities'));
-app.use('/api/gmail',      require('./routes/gmail'));
-app.use('/api/dashboard',  require('./routes/dashboard'));
-app.use('/api/sources',    require('./routes/sources'));
-app.use('/api/scan-queue',   require('./routes/scan-queue'));
+app.use('/api/leads',       require('./routes/leads'));
+app.use('/api/contacts',    require('./routes/contacts'));
+app.use('/api/accounts',    require('./routes/accounts'));
+app.use('/api/deals',       require('./routes/deals'));
+app.use('/api/activities',  require('./routes/activities'));
+app.use('/api/gmail',       require('./routes/gmail'));
+app.use('/api/dashboard',   require('./routes/dashboard'));
+app.use('/api/sources',     require('./routes/sources'));
+app.use('/api/scan-queue',  require('./routes/scan-queue'));
 app.use('/api/bulk-import', require('./routes/bulk-import'));
 
 // Settings
@@ -43,7 +48,9 @@ app.get('/api/settings', async (req, res) => {
     const result = {};
     (data || []).forEach(s => { result[s.key] = s.value; });
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.put('/api/settings', async (req, res) => {
@@ -57,7 +64,9 @@ app.put('/api/settings', async (req, res) => {
       );
     }
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Global search
@@ -77,12 +86,14 @@ app.get('/api/search', async (req, res) => {
         .ilike('name', s).limit(5),
     ]);
     res.json({
-      leads:    leadsR.data    || [],
+      leads: leadsR.data || [],
       contacts: contactsR.data || [],
       accounts: accountsR.data || [],
-      deals:    dealsR.data    || [],
+      deals: dealsR.data || [],
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Health check
