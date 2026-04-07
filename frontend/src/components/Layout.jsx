@@ -2,14 +2,14 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import {
   LayoutDashboard, Users, UserCheck, Building2, Kanban,
-  Activity, Mail, Settings, Search, Bell, ChevronRight, X, Tag
+  Activity, Mail, Settings, Search, Bell, Tag
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { activitiesApi, searchApi } from '../api'
 
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/leads', icon: UserCheck, label: 'Leads' },
+  { to: '/deals', icon: UserCheck, label: 'Deals' },
   { to: '/sources', icon: Tag, label: 'Sources' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/accounts', icon: Building2, label: 'Accounts' },
@@ -18,6 +18,23 @@ const nav = [
   { to: '/emails', icon: Mail, label: 'Email Inbox' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
+
+function STCLogo() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="stcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#60A5FA" />
+          <stop offset="100%" stopColor="#818CF8" />
+        </linearGradient>
+      </defs>
+      <polygon points="16,2 30,28 2,28" fill="url(#stcGrad)" />
+      <polygon points="16,10 24,26 8,26" fill="white" fillOpacity="0.2" />
+      <text x="16" y="25" textAnchor="middle" fill="white" fontSize="8" fontWeight="800"
+        fontFamily="system-ui,sans-serif" letterSpacing="0.5">ST</text>
+    </svg>
+  )
+}
 
 export default function Layout() {
   const [search, setSearch] = useState('')
@@ -52,11 +69,12 @@ export default function Layout() {
       {/* Sidebar */}
       <aside className="w-60 bg-gray-900 text-white flex flex-col">
         <div className="p-5 border-b border-gray-700">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-              <Kanban size={16} className="text-white" />
+          <div className="flex items-center gap-2.5">
+            <STCLogo />
+            <div>
+              <span className="font-bold text-base leading-tight block">STC Sales Engine</span>
+              <span className="text-xs text-gray-400 leading-tight">Seventh Triangle</span>
             </div>
-            <span className="font-bold text-lg">Sales CRM</span>
           </div>
         </div>
 
@@ -85,7 +103,7 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-gray-700 text-xs text-gray-500">
-          Sales CRM v1.0
+          STC Sales Engine v1.0
         </div>
       </aside>
 
@@ -98,16 +116,16 @@ export default function Layout() {
             <input
               value={search}
               onChange={handleSearch}
-              placeholder="Search leads, contacts, deals..."
+              placeholder="Search deals, contacts, accounts..."
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {searchResults && totalResults > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
                 {searchResults.leads?.map(l => (
-                  <button key={l.id} onClick={() => { navigate('/leads'); setSearch(''); setSearchResults(null); }}
+                  <button key={l.id} onClick={() => { navigate('/deals'); setSearch(''); setSearchResults(null); }}
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-sm border-b border-gray-100">
                     <UserCheck size={14} className="text-yellow-500 flex-shrink-0" />
-                    <div><div className="font-medium">{l.first_name} {l.last_name}</div><div className="text-gray-500 text-xs">{l.email} · Lead</div></div>
+                    <div><div className="font-medium">{l.first_name} {l.last_name}</div><div className="text-gray-500 text-xs">{l.email} · Deal</div></div>
                   </button>
                 ))}
                 {searchResults.contacts?.map(c => (
@@ -118,7 +136,7 @@ export default function Layout() {
                   </button>
                 ))}
                 {searchResults.accounts?.map(a => (
-                  <button key={a.id} onClick={() => { navigate('/accounts'); setSearch(''); setSearchResults(null); }}
+                   <button key={a.id} onClick={() => { navigate('/accounts'); setSearch(''); setSearchResults(null); }}
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-sm border-b border-gray-100">
                     <Building2 size={14} className="text-green-500 flex-shrink-0" />
                     <div><div className="font-medium">{a.name}</div><div className="text-gray-500 text-xs">{a.industry} · Account</div></div>
