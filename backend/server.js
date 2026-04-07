@@ -29,7 +29,8 @@ app.use('/api/activities', require('./routes/activities'));
 app.use('/api/gmail',      require('./routes/gmail'));
 app.use('/api/dashboard',  require('./routes/dashboard'));
 app.use('/api/sources',    require('./routes/sources'));
-app.use('/api/scan-queue', require('./routes/scan-queue'));
+app.use('/api/scan-queue',   require('./routes/scan-queue'));
+app.use('/api/bulk-import', require('./routes/bulk-import'));
 
 // Settings
 app.get('/api/settings', async (req, res) => {
@@ -90,7 +91,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Da
 // Local dev only
 if (require.main === module) {
   const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => console.log(`CRM API at http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`🚀 CRM API at http://localhost:${PORT}`));
 }
 
 module.exports = app;
