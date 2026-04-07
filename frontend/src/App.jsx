@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
-import Leads from './pages/Leads'
+import Deals from './pages/Deals'
 import Contacts from './pages/Contacts'
 import Accounts from './pages/Accounts'
 import Pipeline from './pages/Pipeline'
@@ -17,7 +17,8 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="leads" element={<Leads />} />
+          <Route path="deals" element={<Deals />} />
+          <Route path="leads" element={<Navigate to="/deals" replace />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="pipeline" element={<Pipeline />} />

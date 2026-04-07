@@ -91,4 +91,12 @@ export const searchApi = {
   search: (q) => api.get('/search', { params: { q } }).then(r => r.data),
 }
 
+export const importApi = {
+  importLeads:     (records) => api.post('/leads/bulk',           { records }).then(r => r.data),
+  importContacts:  (records) => api.post('/bulk-import/contacts', { records }).then(r => r.data),
+  importAccounts:  (records) => api.post('/bulk-import/accounts', { records }).then(r => r.data),
+  importSources:   (records) => api.post('/bulk-import/sources',  { records }).then(r => r.data),
+  importPipeline:  (records) => api.post('/bulk-import/pipeline', { records }).then(r => r.data),
+}
+
 export default api
