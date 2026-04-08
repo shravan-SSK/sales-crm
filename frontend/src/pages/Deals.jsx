@@ -224,7 +224,7 @@ function LinkedInDataCard({ data, linkedinUrl }) {
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Experience</p>
           </div>
           <div className="space-y-2">
-            x(expanded ? data.experience : data.experience.slice(0, 2)).map((exp, i) => (
+            {(expanded ? data.experience : data.experience.slice(0, 2)).map((exp, i) => (
               <div key={i} className="flex gap-2">
                 <div className="w-1 bg-blue-200 rounded-full flex-shrink-0 mt-1" />
                 <div>
