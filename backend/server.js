@@ -13,7 +13,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow no-origin (server-to-server), explicit whitelist, or any *.vercel.app preview URL
     if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
       return cb(null, true);
     }
@@ -26,15 +25,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/leads',       require('./routes/leads'));
-app.use('/api/contacts',    require('./routes/contacts'));
-app.use('/api/accounts',    require('./routes/accounts'));
-app.use('/api/deals',       require('./routes/deals'));
-app.use('/api/activities',  require('./routes/activities'));
-app.use('/api/gmail',       require('./routes/gmail'));
-app.use('/api/dashboard',   require('./routes/dashboard'));
-app.use('/api/sources',     require('./routes/sources'));
-app.use('/api/scan-queue',  require('./routes/scan-queue'));
+app.use('/api/leads', require('./routes/leads'));
+app.use('/api/contacts', require('./routes/contacts'));
+app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/deals', require('./routes/deals'));
+app.use('/api/deals/:id', require('./routes/deal-details'));
+app.use('/api/activities', require('./routes/activities'));
+app.use('/api/gmail', require('./routes/gmail'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/sources', require('./routes/sources'));
+app.use('/api/scan-queue', require('./routes/scan-queue'));
 app.use('/api/bulk-import', require('./routes/bulk-import'));
 
 // Settings
@@ -48,9 +48,7 @@ app.get('/api/settings', async (req, res) => {
     const result = {};
     (data || []).forEach(s => { result[s.key] = s.value; });
     res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/settings', async (req, res) => {
@@ -64,9 +62,7 @@ app.put('/api/settings', async (req, res) => {
       );
     }
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Global search
@@ -91,15 +87,12 @@ app.get('/api/search', async (req, res) => {
       accounts: accountsR.data || [],
       deals: dealsR.data || [],
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// Local dev only
 if (require.main === module) {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => console.log(`🚀 CRM API at http://localhost:${PORT}`));
