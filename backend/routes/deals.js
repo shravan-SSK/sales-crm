@@ -3,6 +3,17 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const supabase = require('../lib/supabase');
 
+async function addTimeline(deal_id, event_type, title, description, metadata) {
+  try {
+    await supabase.from('deal_timeline').insert({
+      id: uuidv4(), deal_id, event_type, title,
+      description: description || null,
+      metadata: metadata ? JSON.stringify(metadata) : null,
+      created_at: new Date().toISOString()
+    })
+  } catch (e) { console.error('Timeline error:', e.message) }
+}
+
 // GET /pipeline — deals grouped by stage (MUST be before /:id)
 router.get('/pipeline', async (req, res) => {
   try {
@@ -24,9 +35,7 @@ router.get('/pipeline', async (req, res) => {
       });
     });
     res.json(pipeline);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /forecast — monthly revenue forecast (MUST be before /:id)
@@ -52,9 +61,7 @@ router.get('/forecast', async (req, res) => {
       result.push({ month, label, deal_count: monthDeals.length, pipeline, weighted, committed });
     }
     res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /
@@ -72,15 +79,16 @@ router.get('/', async (req, res) => {
       accounts: undefined,
       contacts: undefined
     })));
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /:id
 router.get('/:id', async (req, res) => {
   try {
-    const { data: deal, error } = await supabase.from('deals').select('*, accounts(name), contacts(first_name,last_name,email)').eq('id', req.params.id).single();
+    const { data: deal, error } = await supabase
+      .from('deals')
+      .select('*, accounts(name), contacts(first_name,last_name,email)')
+      .eq('id', req.params.id).single();
     if (error || !deal) return res.status(404).json({ error: 'Deal not found' });
     const [activitiesR, stakeholdersR] = await Promise.all([
       supabase.from('activities').select('*').eq('deal_id', req.params.id).order('created_at', { ascending: false }),
@@ -89,36 +97,80 @@ router.get('/:id', async (req, res) => {
     res.json({
       ...deal,
       account_name: deal.accounts?.name || null,
-      accounts: undefined,
-      contacts: undefined,
+      contact_name: deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : null,
       activities: activitiesR.data || [],
       stakeholders: (stakeholdersR.data || []).map(s => ({ ...s, ...s.contacts, contacts: undefined }))
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /
+// POST / — create deal with optional auto-create account + contact
 router.post('/', async (req, res) => {
   try {
-    const { name, account_id, contact_id, stage, value, probability, close_date, notes } = req.body;
+    const {
+      name, account_id, contact_id, stage, value, probability, close_date, notes,
+      new_account_name, new_contact_first_name, new_contact_last_name, new_contact_email
+    } = req.body;
     if (!name) return res.status(400).json({ error: 'Deal name required' });
+
+    let finalAccountId = account_id || null;
+    let finalContactId = contact_id || null;
+    let autoCreated = {};
+
+    // Auto-create account if new name provided and no existing account selected
+    if (!finalAccountId && new_account_name?.trim()) {
+      const { data: acct, error: acctErr } = await supabase.from('accounts').insert({
+        id: uuidv4(), name: new_account_name.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      }).select().single();
+      if (acctErr) throw acctErr;
+      finalAccountId = acct.id;
+      autoCreated.account = acct;
+    }
+
+    // Auto-create contact if new name provided and no existing contact selected
+    if (!finalContactId && new_contact_first_name?.trim()) {
+      const contactData = {
+        id: uuidv4(),
+        first_name: new_contact_first_name.trim(),
+        last_name: (new_contact_last_name || '').trim(),
+        account_id: finalAccountId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      if (new_contact_email?.trim()) contactData.email = new_contact_email.trim();
+      const { data: ct, error: ctErr } = await supabase.from('contacts').insert(contactData).select().single();
+      if (ctErr) {
+        // If duplicate email, find existing contact
+        if (ctErr.message?.includes('unique') || ctErr.message?.includes('duplicate')) {
+          if (new_contact_email?.trim()) {
+            const { data: existing } = await supabase.from('contacts').select('id').eq('email', new_contact_email.trim()).single();
+            if (existing) finalContactId = existing.id;
+          }
+        } else {
+          throw ctErr;
+        }
+      } else if (ct) {
+        finalContactId = ct.id;
+        autoCreated.contact = ct;
+      }
+    }
+
+    const dealId = uuidv4();
+    const dealStage = stage || 'lead';
     const { data, error } = await supabase.from('deals').insert({
-      id: uuidv4(), name,
-      account_id: account_id || null,
-      contact_id: contact_id || null,
-      stage: stage || 'lead',
-      value: value || 0,
-      probability: probability || 0,
-      close_date: close_date || null,
-      notes: notes || null
+      id: dealId, name, account_id: finalAccountId, contact_id: finalContactId,
+      stage: dealStage, value: value || 0, probability: probability || 0,
+      close_date: close_date || null, notes: notes || null
     }).select().single();
     if (error) throw error;
-    res.status(201).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+
+    // Add deal_created timeline event
+    await addTimeline(dealId, 'deal_created', `Deal created: ${name}`,
+      `Stage: ${dealStage}${value ? ` | Value: $${Number(value).toLocaleString()}` : ''}`,
+      { stage: dealStage, value: value || 0 });
+
+    res.status(201).json({ ...data, auto_created: autoCreated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PUT /:id
@@ -126,12 +178,16 @@ router.put('/:id', async (req, res) => {
   try {
     const { data: existing, error: fe } = await supabase.from('deals').select('*').eq('id', req.params.id).single();
     if (fe || !existing) return res.status(404).json({ error: 'Deal not found' });
+
     const { name, account_id, contact_id, stage, value, probability, close_date, notes } = req.body;
+    const oldStage = existing.stage;
+    const newStage = stage ?? existing.stage;
+
     const { data, error } = await supabase.from('deals').update({
       name: name ?? existing.name,
       account_id: account_id !== undefined ? account_id : existing.account_id,
       contact_id: contact_id !== undefined ? contact_id : existing.contact_id,
-      stage: stage ?? existing.stage,
+      stage: newStage,
       value: value !== undefined ? value : existing.value,
       probability: probability !== undefined ? probability : existing.probability,
       close_date: close_date !== undefined ? close_date : existing.close_date,
@@ -139,10 +195,17 @@ router.put('/:id', async (req, res) => {
       updated_at: new Date().toISOString()
     }).eq('id', req.params.id).select().single();
     if (error) throw error;
+
+    // Record stage change in timeline
+    if (stage && stage !== oldStage) {
+      await addTimeline(req.params.id, 'stage_change',
+        `Stage moved: ${oldStage} → ${stage}`,
+        null,
+        { old_stage: oldStage, new_stage: stage });
+    }
+
     res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /:id
@@ -151,9 +214,7 @@ router.delete('/:id', async (req, res) => {
     const { error } = await supabase.from('deals').delete().eq('id', req.params.id);
     if (error) throw error;
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /:id/stakeholders
@@ -166,9 +227,7 @@ router.post('/:id/stakeholders', async (req, res) => {
     }).select().single();
     if (error) throw error;
     res.status(201).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /:id/stakeholders/:stakeholderId
@@ -177,9 +236,7 @@ router.delete('/:id/stakeholders/:stakeholderId', async (req, res) => {
     const { error } = await supabase.from('deal_stakeholders').delete().eq('id', req.params.stakeholderId);
     if (error) throw error;
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
