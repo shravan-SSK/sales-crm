@@ -9,6 +9,7 @@ import Activities from './pages/Activities'
 import Settings from './pages/Settings'
 import EmailThreads from './pages/EmailThreads'
 import Sources from './pages/Sources'
+import DealDetail from './pages/DealDetail'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="deals" element={<Deals />} />
+          <Route path="deals/:id" element={<DealDetail />} />
           <Route path="leads" element={<Navigate to="/deals" replace />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="accounts" element={<Accounts />} />

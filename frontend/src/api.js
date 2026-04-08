@@ -1,15 +1,10 @@
 import axios from 'axios'
 
-// In production (Render), VITE_API_URL is set to your backend service URL.
-// In development, it falls back to '/api' which is proxied by Vite.
 const baseURL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api'
 
-const api = axios.create({
-  baseURL,
-  headers: { 'Content-Type': 'application/json' }
-})
+const api = axios.create({ baseURL, headers: { 'Content-Type': 'application/json' } })
 
 export const leadsApi = {
   getAll: (params) => api.get('/leads', { params }).then(r => r.data),
@@ -54,7 +49,23 @@ export const dealsApi = {
   update: (id, data) => api.put(`/deals/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/deals/${id}`).then(r => r.data),
   addStakeholder: (id, contact_id, role) => api.post(`/deals/${id}/stakeholders`, { contact_id, role }).then(r => r.data),
-  removeStakeholder: (id, contact_id) => api.delete(`/deals/${id}/stakeholders/${contact_id}`).then(r => r.data),
+  removeStakeholder: (id, stakeholderId) => api.delete(`/deals/${id}/stakeholders/${stakeholderId}`).then(r => r.data),
+}
+
+export const dealDetailApi = {
+  getTimeline:    (id) => api.get(`/deals/${id}/timeline`).then(r => r.data),
+  getDocuments:   (id) => api.get(`/deals/${id}/documents`).then(r => r.data),
+  addDocument:    (id, data) => api.post(`/deals/${id}/documents`, data).then(r => r.data),
+  updateDocument: (id, docId, data) => api.put(`/deals/${id}/documents/${docId}`, data).then(r => r.data),
+  deleteDocument: (id, docId) => api.delete(`/deals/${id}/documents/${docId}`).then(r => r.data),
+  getNotes:       (id) => api.get(`/deals/${id}/notes`).then(r => r.data),
+  addNote:        (id, data) => api.post(`/deals/${id}/notes`, data).then(r => r.data),
+  updateNote:     (id, noteId, data) => api.put(`/deals/${id}/notes/${noteId}`, data).then(r => r.data),
+  deleteNote:     (id, noteId) => api.delete(`/deals/${id}/notes/${noteId}`).then(r => r.data),
+  getMeetings:    (id) => api.get(`/deals/${id}/meetings`).then(r => r.data),
+  addMeeting:     (id, data) => api.post(`/deals/${id}/meetings`, data).then(r => r.data),
+  updateMeeting:  (id, meetId, data) => api.put(`/deals/${id}/meetings/${meetId}`, data).then(r => r.data),
+  deleteMeeting:  (id, meetId) => api.delete(`/deals/${id}/meetings/${meetId}`).then(r => r.data),
 }
 
 export const activitiesApi = {
@@ -92,11 +103,11 @@ export const searchApi = {
 }
 
 export const importApi = {
-  importLeads:     (records) => api.post('/leads/bulk',           { records }).then(r => r.data),
-  importContacts:  (records) => api.post('/bulk-import/contacts', { records }).then(r => r.data),
-  importAccounts:  (records) => api.post('/bulk-import/accounts', { records }).then(r => r.data),
-  importSources:   (records) => api.post('/bulk-import/sources',  { records }).then(r => r.data),
-  importPipeline:  (records) => api.post('/bulk-import/pipeline', { records }).then(r => r.data),
+  importLeads: (records) => api.post('/leads/bulk', { records }).then(r => r.data),
+  importContacts: (records) => api.post('/bulk-import/contacts', { records }).then(r => r.data),
+  importAccounts: (records) => api.post('/bulk-import/accounts', { records }).then(r => r.data),
+  importSources: (records) => api.post('/bulk-import/sources', { records }).then(r => r.data),
+  importPipeline: (records) => api.post('/bulk-import/pipeline', { records }).then(r => r.data),
 }
 
 export default api
