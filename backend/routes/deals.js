@@ -14,7 +14,7 @@ async function addTimeline(deal_id, event_type, title, description, metadata) {
   } catch (e) { console.error('Timeline error:', e.message) }
 }
 
-// GET /pipeline — deals grouped by stage (MUST be before /:id)
+// GET /pipeline â deals grouped by stage (MUST be before /:id)
 router.get('/pipeline', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -38,7 +38,7 @@ router.get('/pipeline', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /forecast — monthly revenue forecast (MUST be before /:id)
+// GET /forecast â monthly revenue forecast (MUST be before /:id)
 router.get('/forecast', async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 6;
@@ -104,11 +104,11 @@ router.get('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST / — create deal with optional auto-create account + contact
+// POST / â create deal with optional auto-create account + contact
 router.post('/', async (req, res) => {
   try {
     const {
-      name, account_id, contact_id, stage, value, probability, close_date, notes,
+      name, account_id, contact_id, stage, value, probability, close_date, notes, source,
       new_account_name, new_contact_first_name, new_contact_last_name, new_contact_email
     } = req.body;
     if (!name) return res.status(400).json({ error: 'Deal name required' });
@@ -160,7 +160,7 @@ router.post('/', async (req, res) => {
     const { data, error } = await supabase.from('deals').insert({
       id: dealId, name, account_id: finalAccountId, contact_id: finalContactId,
       stage: dealStage, value: value || 0, probability: probability || 0,
-      close_date: close_date || null, notes: notes || null
+      close_date: close_date || null, notes: notes || null, source: source || null
     }).select().single();
     if (error) throw error;
 
@@ -199,7 +199,7 @@ router.put('/:id', async (req, res) => {
     // Record stage change in timeline
     if (stage && stage !== oldStage) {
       await addTimeline(req.params.id, 'stage_change',
-        `Stage moved: ${oldStage} → ${stage}`,
+        `Stage moved: ${oldStage} â ${stage}`,
         null,
         { old_stage: oldStage, new_stage: stage });
     }
