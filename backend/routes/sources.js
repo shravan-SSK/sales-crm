@@ -3,22 +3,24 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const supabase = require('../lib/supabase');
 
-// GET /stats/overview — source performance stats (MUST be before /:id)
+// GET /stats/overview - source performance stats from deals (MUST be before /:id)
 router.get('/stats/overview', async (req, res) => {
   try {
-    const [sourcesR, leadsR] = await Promise.all([
+    const [sourcesR, dealsR] = await Promise.all([
       supabase.from('sources').select('id, name, color').order('name'),
-      supabase.from('leads').select('source, status'),
+      supabase.from('deals').select('source, stage, value'),
     ]);
     if (sourcesR.error) throw sourcesR.error;
-    if (leadsR.error) throw leadsR.error;
-    const leads = leadsR.data || [];
+    if (dealsR.error) throw dealsR.error;
+    const deals = dealsR.data || [];
     const stats = (sourcesR.data || []).map(s => {
-      const sourceLeads = leads.filter(l => l.source === s.name);
+      const sourceDeals = deals.filter(d => d.source === s.name);
+      const total_leads = sourceDeals.length;
+      const converted = sourceDeals.filter(d => d.stage === 'closed_won').length;
+      const total_value = sourceDeals.reduce((sum, d) => sum + Number(d.value || 0), 0);
       return {
         ...s,
-        total_leads: sourceLeads.length,
-        converted: sourceLeads.filter(l => l.status === 'Converted').length,
+        stats: { total_leads, converted, total_value },
       };
     });
     res.json(stats);
