@@ -181,7 +181,7 @@ function DocumentsTab({ dealId }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.other}`}>{doc.type.toUpperCase()}</span>
                   <span className="text-sm font-medium">{doc.title}</span>
-                  {doc.url && {doc.url ? (
+                  {doc.url ? (
                     doc.url.startsWith('data:') ? (
                       <a href={doc.url} download={doc.title || 'document'} className="text-xs text-blue-600 hover:underline">
                         ⬇ Download file
@@ -191,7 +191,7 @@ function DocumentsTab({ dealId }) {
                         {doc.url}
                       </a>
                     )
-                  ) : null}}
+                  ) : null}
                 </div>
                 {doc.notes && <p className="text-xs text-gray-500 mt-1">{doc.notes}</p>}
                 <p className="text-xs text-gray-400 mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
