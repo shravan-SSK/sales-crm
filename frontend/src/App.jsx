@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Deals from './pages/Deals'
 import Contacts from './pages/Contacts'
 import Accounts from './pages/Accounts'
+import AccountDetail from './pages/AccountDetail'
 import Pipeline from './pages/Pipeline'
 import Activities from './pages/Activities'
 import Settings from './pages/Settings'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="leads" element={<Navigate to="/deals" replace />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="accounts" element={<Accounts />} />
+          <Route path="accounts/:id" element={<AccountDetail />} />
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="activities" element={<Activities />} />
           <Route path="emails" element={<EmailThreads />} />
@@ -32,4 +34,4 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   )
-}
+} 
