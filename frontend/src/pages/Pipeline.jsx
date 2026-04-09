@@ -96,7 +96,6 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
             </div>
           )}
         </div>
-      </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Stage</label>
           <select className="input" value={form.stage} onChange={e => set('stage', e.target.value)}>
