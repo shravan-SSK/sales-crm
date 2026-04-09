@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { dealsApi, accountsApi, contactsApi } from '../api'
+import { dealsApi, accountsApi, contactsApi, sourcesApi } from '../api'
 import api from '../api'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import Modal from '../components/Modal'
 
 // Color palette cycled for dynamic stages
-const STAGE_COLORS = [
+const STACE_COLORS = [
   { color: 'bg-gray-100', header: 'bg-gray-200', text: 'text-gray-700', dot: 'bg-gray-400' },
   { color: 'bg-blue-50', header: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
   { color: 'bg-yellow-50', header: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500' },
@@ -27,7 +27,7 @@ function buildStageConfig(labels) {
   }, {})
 }
 
-function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], stageConfig = {}, onSubmit, onCancel, isLoading }) {
+function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], stageConfig = {}, sources = [], onSubmit, onCancel, isLoading }) {
   const [form, setForm] = useState({
     name: initial.name || '',
     account_id: initial.account_id || '',
@@ -37,6 +37,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
     probability: initial.probability || '',
     close_date: initial.close_date || '',
     notes: initial.notes || '',
+    source: initial.source || '',
   })
   const [newAccountName, setNewAccountName] = useState('')
   const [newContactFirst, setNewContactFirst] = useState('')
@@ -63,36 +64,32 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div><label className="label">Deal Name *</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} required /></div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="label">Account</label>
-          <select className="input" value={form.account_id} onChange={e => set('account_id', e.target.value)}>
-            <option value="">No Account</option>
-            <option value="__new__">+ Create new accountâ¦</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          {form.account_id === '__new__' && (
-            <input className="input mt-1" placeholder="Company name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} required />
-          )}
-        </div>
-        <div>
-          <label className="label">Primary Contact</label>
-          <select className="input" value={form.contact_id} onChange={e => set('contact_id', e.target.value)}>
-            <option value="">No Contact</option>
-            <option value="__new__">+ Create new contactâ¦</option>
-            {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
-          </select>
-          {form.contact_id === '__new__' && (
-            <div className="space-y-1 mt-1">
-              <div className="grid grid-cols-2 gap-1">
-                <input className="input" placeholder="First name" value={newContactFirst} onChange={e => setNewContactFirst(e.target.value)} required />
-                <input className="input" placeholder="Last name" value={newContactLast} onChange={e => setNewContactLast(e.target.value)} />
-              </div>
-              <input className="input" placeholder="Email" type="email" value={newContactEmail} onChange={e => setNewContactEmail(e.target.value)} />
-            </div>
-          )}
-        </div>
+      <div><label className="label">Deal Name*</label><input className="input" value={form.name} onChange={e => set('name', e.target.value)} required /></div>
+      <div>
+        <label className="label">Account</label>
+        <select className="input" value={form.account_id} onChange={e => set('account_id', e.target.value)}>
+          <option value="">No Account</option>
+          <option value="__new__">+ Create New Account</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {form.account_id === '__new__' && (
+          <input className="input mt-2" placeholder="New account name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} required />
+        )}
+      </div>
+      <div>
+        <label className="label">Contact</label>
+        <select className="input" value={form.contact_id} onChange={e => set('contact_id', e.target.value)}>
+          <option value="">No Contact</option>
+          <option value="__new__">+ Create New Contact</option>
+          {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+        </select>
+        {form.contact_id === '__new__' && (
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <input className="input" placeholder="First name" value={newContactFirst} onChange={e => setNewContactFirst(e.target.value)} required />
+            <input className="input" placeholder="Last name" value={newContactLast} onChange={e => setNewContactLast(e.target.value)} />
+            <input className="input col-span-2" placeholder="Email" value={newContactEmail} onChange={e => setNewContactEmail(e.target.value)} />
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Stage</label>
@@ -100,14 +97,22 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
             {stages.map(s => <option key={s} value={s}>{stageConfig[s]?.label || s}</option>)}
           </select>
         </div>
+        <div><label className="label">Lead Source</label>
+          <select className="input" value={form.source} onChange={e => set('source', e.target.value)}>
+            <option value="">No Source</option>
+            {sources.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+        </div>   </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Deal Value ($)</label>
           <input className="input" type="number" min="0" step="0.01" value={form.value} onChange={e => set('value', e.target.value)} />
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Probability (%)</label>
           <input className="input" type="number" min="0" max="100" value={form.probability} onChange={e => set('probability', e.target.value)} />
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Expected Close Date</label>
           <input className="input" type="date" value={form.close_date} onChange={e => set('close_date', e.target.value)} />
         </div>
@@ -145,6 +150,7 @@ export default function Deals() {
   const { data: deals = [], isLoading } = useQuery({ queryKey: ['deals'], queryFn: dealsApi.getAll })
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: () => accountsApi.getAll() })
   const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => contactsApi.getAll() })
+  const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: sourcesApi.getAll })
 
   const createMut = useMutation({
     mutationFn: dealsApi.create,
@@ -154,6 +160,7 @@ export default function Deals() {
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['accounts'] })
       qc.invalidateQueries({ queryKey: ['contacts'] })
+      qc.invalidateQueries({ queryKey: ['sources-stats'] })
       setShowModal(false)
     }
   })
@@ -164,6 +171,7 @@ export default function Deals() {
       qc.invalidateQueries({ queryKey: ['deals'] })
       qc.invalidateQueries({ queryKey: ['pipeline'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['sources-stats'] })
       setEditingDeal(null)
     }
   })
@@ -174,6 +182,7 @@ export default function Deals() {
       qc.invalidateQueries({ queryKey: ['deals'] })
       qc.invalidateQueries({ queryKey: ['pipeline'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['sources-stats'] })
     }
   })
 
@@ -207,6 +216,7 @@ export default function Deals() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Account</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Contact</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Stage</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Source</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Value</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Probability</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Close Date</th>
@@ -236,6 +246,7 @@ export default function Deals() {
                         {cfg.label}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-gray-600">{deal.source || '-'}</td>
                     <td className="px-4 py-3 text-right font-semibold text-green-600">${(deal.value || 0).toLocaleString()}</td>
                     <td className="px-4 py-3 text-center text-gray-600">{deal.probability}%</td>
                     <td className="px-4 py-3 text-gray-600">{deal.close_date || '-'}</td>
@@ -267,7 +278,7 @@ export default function Deals() {
       {/* Add Deal Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Deal" size="lg">
         <DealForm
-          accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig}
+          accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} sources={sources}
           onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending}
         />
       </Modal>
@@ -275,7 +286,7 @@ export default function Deals() {
       {/* Edit Deal Modal */}
       <Modal isOpen={!!editingDeal} onClose={() => setEditingDeal(null)} title="Edit Deal" size="lg">
         {editingDeal && <DealForm
-          initial={editingDeal} accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig}
+          initial={editingDeal} accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} sources={sources}
           onSubmit={data => updateMut.mutate({ id: editingDeal.id, data })}
           onCancel={() => setEditingDeal(null)} isLoading={updateMut.isPending}
         />}
