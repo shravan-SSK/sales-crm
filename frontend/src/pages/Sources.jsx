@@ -116,7 +116,7 @@ export default function Sources() {
   })
 
   const totalLeads = sources.reduce((s, x) => s + (x.stats?.total_leads || 0), 0)
-  const totalConverted = sources.reduce((s, x) => s + (x.stats?.converted || 0), 0)
+  const totalConverted = sources.reduce((s, x) => s + (x.stats?.stage_closed_won || 0), 0)
   const topSource = [...sources].sort((a, b) => (b.stats?.total_leads || 0) - (a.stats?.total_leads || 0))[0]
 
   return (
@@ -160,15 +160,17 @@ export default function Sources() {
           <div className="divide-y divide-gray-50">
             <div className="grid grid-cols-12 px-5 py-2.5 bg-gray-50 text-xs font-medium text-gray-400 uppercase tracking-wide">
               <div className="col-span-3">Source</div>
-              <div className="col-span-2 text-center">Total Leads</div>
-              <div className="col-span-2 text-center">New</div>
-              <div className="col-span-2 text-center">Qualified</div>
-              <div className="col-span-2 text-center">Converted</div>
-              <div className="col-span-1"></div>
+              <div className="col-span-1 text-center">Total</div>
+              <div className="col-span-1 text-center">Lead</div>
+              <div className="col-span-1 text-center">Qualified</div>
+              <div className="col-span-1 text-center">Proposal</div>
+              <div className="col-span-1 text-center">Negotiation</div>
+              <div className="col-span-2 text-center">Closed Won</div>
+              <div className="col-span-2"></div>
             </div>
             {sources.map(source => {
               const s = source.stats || {}
-              const rate = s.total_leads > 0 ? Math.round((s.converted / s.total_leads) * 100) : 0
+              const rate = s.total_leads > 0 ? Math.round(((s.stage_closed_won || 0) / s.total_leads) * 100) : 0
               return (
                 <div key={source.id} className="grid grid-cols-12 px-5 py-4 items-center hover:bg-gray-50 transition-colors">
                   <div className="col-span-3 flex items-center gap-3">
@@ -182,12 +184,14 @@ export default function Sources() {
                       )}
                     </div>
                   </div>
-                  <div className="col-span-2 text-center"><span className="text-lg font-bold text-gray-800">{s.total_leads || 0}</span></div>
-                  <div className="col-span-2 text-center"><span className="text-sm text-blue-600 font-medium">{s.new_leads || 0}</span></div>
-                  <div className="col-span-2 text-center"><span className="text-sm text-green-600 font-medium">{s.qualified || 0}</span></div>
+                  <div className="col-span-1 text-center"><span className="text-lg font-bold text-gray-800">{s.total_leads || 0}</span></div>
+                  <div className="col-span-1 text-center"><span className="text-sm text-blue-600 font-medium">{s.stage_lead || 0}</span></div>
+                  <div className="col-span-1 text-center"><span className="text-sm text-indigo-600 font-medium">{s.stage_qualified || 0}</span></div>
+                  <div className="col-span-1 text-center"><span className="text-sm text-yellow-600 font-medium">{s.stage_proposal || 0}</span></div>
+                  <div className="col-span-1 text-center"><span className="text-sm text-orange-600 font-medium">{s.stage_negotiation || 0}</span></div>
                   <div className="col-span-2 text-center">
                     <div>
-                      <span className="text-sm text-purple-600 font-medium">{s.converted || 0}</span>
+                      <span className="text-sm text-green-600 font-medium">{s.stage_closed_won || 0}</span>
                       {s.total_leads > 0 && (
                         <div className="mt-1">
                           <div className="h-1 bg-gray-100 rounded-full w-16 mx-auto">
