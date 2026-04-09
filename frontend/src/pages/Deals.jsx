@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import Modal from '../components/Modal'
 
 // Color palette cycled for dynamic stages
-const STACE_COLORS = [
+const STAGE_COLORS = [
   { color: 'bg-gray-100', header: 'bg-gray-200', text: 'text-gray-700', dot: 'bg-gray-400' },
   { color: 'bg-blue-50', header: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
   { color: 'bg-yellow-50', header: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500' },
