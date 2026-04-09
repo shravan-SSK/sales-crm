@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { dealsApi, accountsApi, contactsApi } from '../api'
+import { dealsApi, accountsApi, contactsApi, sourcesApi } from '../api'
 import api from '../api'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { Plus, DollarSign, Calendar, Users, TrendingUp, BarChart2 } from 'lucide-react'
@@ -29,7 +29,7 @@ function buildStageConfig(labels) {
   }, {})
 }
 
-function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], stageConfig = {}, onSubmit, onCancel, isLoading }) {
+function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], stageConfig = {}, sources = [], onSubmit, onCancel, isLoading }) {
   const [form, setForm] = useState({
     name: initial.name || '',
     account_id: initial.account_id || '',
@@ -39,6 +39,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
     probability: initial.probability || '',
     close_date: initial.close_date || '',
     notes: initial.notes || '',
+    source: initial.source || '',
   })
   const [newAccountName, setNewAccountName] = useState('')
   const [newContactFirst, setNewContactFirst] = useState('')
@@ -102,9 +103,18 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
             {stages.map(s => <option key={s} value={s}>{stageConfig[s]?.label || s}</option>)}
           </select>
         </div>
+        <div><label className="label">Lead Source</label>
+          <select className="input" value={form.source} onChange={e => set('source', e.target.value)}>
+            <option value="">No Source</option>
+            {sources.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Deal Value ($)</label>
           <input className="input" type="number" min="0" step="0.01" value={form.value} onChange={e => set('value', e.target.value)} />
         </div>
+      </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Probability (%)</label>
@@ -240,6 +250,7 @@ export default function Pipeline() {
   const { data: forecast = [] } = useQuery({ queryKey: ['forecast'], queryFn: () => dealsApi.getForecast(6), enabled: view === 'forecast' })
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: () => accountsApi.getAll() })
   const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => contactsApi.getAll() })
+  const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: sourcesApi.getAll })
 
   const createMut = useMutation({
     mutationFn: dealsApi.create,
@@ -248,6 +259,7 @@ export default function Pipeline() {
       qc.invalidateQueries(['dashboard'])
       qc.invalidateQueries(['accounts'])
       qc.invalidateQueries(['contacts'])
+      qc.invalidateQueries(['sources-stats'])
       setShowModal(false)
     }
   })
@@ -393,7 +405,7 @@ export default function Pipeline() {
       {/* Add Deal Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Deal" size="lg">
         <DealForm
-          accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig}
+          accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} sources={sources}
           onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending}
         />
       </Modal>
@@ -401,7 +413,7 @@ export default function Pipeline() {
       {/* Edit Deal Modal */}
       <Modal isOpen={!!editingDeal} onClose={() => setEditingDeal(null)} title="Edit Deal" size="lg">
         {editingDeal && <DealForm
-          initial={editingDeal} accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig}
+          initial={editingDeal} accounts={accounts} contacts={contacts} stages={stages} stageConfig={stageConfig} sources={sources}
           onSubmit={data => updateMut.mutate({ id: editingDeal.id, data })}
           onCancel={() => setEditingDeal(null)} isLoading={updateMut.isPending}
         />}
