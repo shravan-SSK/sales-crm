@@ -7,20 +7,26 @@ const supabase = require('../lib/supabase');
 router.get('/stats/overview', async (req, res) => {
   try {
     const [sourcesR, dealsR] = await Promise.all([
-      supabase.from('sources').select('id, name, color').order('name'),
+      supabase.from('sources').select('id, name, color, is_active').order('name'),
       supabase.from('deals').select('source, stage, value'),
     ]);
     if (sourcesR.error) throw sourcesR.error;
     if (dealsR.error) throw dealsR.error;
     const deals = dealsR.data || [];
+    const allDeals = dealsR.data || [];
     const stats = (sourcesR.data || []).map(s => {
-      const sourceDeals = deals.filter(d => d.source === s.name);
-      const total_leads = sourceDeals.length;
-      const converted = sourceDeals.filter(d => d.stage === 'closed_won').length;
-      const total_value = sourceDeals.reduce((sum, d) => sum + Number(d.value || 0), 0);
+      const srcDeals = allDeals.filter(d => d.source === s.name);
+      const total_leads = srcDeals.length;
+      const stage_lead = srcDeals.filter(d => d.stage === 'lead').length;
+      const stage_qualified = srcDeals.filter(d => d.stage === 'qualified').length;
+      const stage_proposal = srcDeals.filter(d => d.stage === 'proposal').length;
+      const stage_negotiation = srcDeals.filter(d => d.stage === 'negotiation').length;
+      const stage_closed_won = srcDeals.filter(d => d.stage === 'closed_won').length;
+      const converted_value = srcDeals.filter(d => d.stage === 'closed_won').reduce((sum, d) => sum + parseFloat(d.value || 0), 0);
+      const total_value = srcDeals.reduce((sum, d) => sum + parseFloat(d.value || 0), 0);
       return {
         ...s,
-        stats: { total_leads, converted, total_value },
+        stats: { total_leads, stage_lead, stage_qualified, stage_proposal, stage_negotiation, stage_closed_won, converted_value, total_value },
       };
     });
     res.json(stats);
