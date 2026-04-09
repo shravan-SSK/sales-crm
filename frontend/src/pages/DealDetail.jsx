@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { dealsApi, dealDetailApi, accountsApi, contactsApi } from '../api'
@@ -104,8 +104,21 @@ function DocumentsTab({ dealId }) {
   })
 
   const [showForm, setShowForm] = useState(false)
+  const [uploadMode, setUploadMode] = useState('url')
+  const fileInputRef = useRef(null)
   const [form, setForm] = useState({ type: 'other', title: '', url: '', notes: '' })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      set('url', evt.target.result)
+      if (!form.title) set('title', file.name)
+    }
+    reader.readAsDataURL(file)
+  }
 
   return (
     <div className="space-y-4">
@@ -130,8 +143,21 @@ function DocumentsTab({ dealId }) {
             </div>
           </div>
           <div>
-            <label className="label">URL / Link</label>
-            <input className="input" value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://..." />
+            <div className="flex items-center gap-2 mb-1">
+              <label className="label mb-0">Source</label>
+              <button type="button" className={`text-xs px-2 py-0.5 rounded border ${uploadMode === 'url' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`} onClick={() => { setUploadMode('url'); set('url', '') }}>URL Link</button>
+              <button type="button" className={`text-xs px-2 py-0.5 rounded border ${uploadMode === 'file' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`} onClick={() => { setUploadMode('file'); set('url', '') }}>Upload File</button>
+            </div>
+            {uploadMode === 'url' ? (
+              <input className="input" value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://..." />
+            ) : (
+              <div>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
+                <button type="button" className="btn-secondary text-sm w-full text-left" onClick={() => fileInputRef.current?.click()}>
+                  {form.url ? '✓ File loaded — click to change' : '📁 Choose file from computer…'}
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Notes</label>
@@ -155,7 +181,17 @@ function DocumentsTab({ dealId }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.other}`}>{doc.type.toUpperCase()}</span>
                   <span className="text-sm font-medium">{doc.title}</span>
-                  {doc.url && <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline"><ExternalLink size={12} /></a>}
+                  {doc.url && {doc.url ? (
+                    doc.url.startsWith('data:') ? (
+                      <a href={doc.url} download={doc.title || 'document'} className="text-xs text-blue-600 hover:underline">
+                        ⬇ Download file
+                      </a>
+                    ) : (
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate max-w-xs block">
+                        {doc.url}
+                      </a>
+                    )
+                  ) : null}}
                 </div>
                 {doc.notes && <p className="text-xs text-gray-500 mt-1">{doc.notes}</p>}
                 <p className="text-xs text-gray-400 mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
