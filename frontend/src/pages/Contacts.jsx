@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactsApi, accountsApi } from '../api'
-import { Plus, Pencil, Trash2, Mail, Phone, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Mail, Phone, Search, Upload } from 'lucide-react'
 import Modal from '../components/Modal'
+import BulkUploadModal from '../components/BulkUploadModal'
 
 function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoading }) {
   const [form, setForm] = useState({
@@ -53,6 +54,7 @@ function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoadin
 
 export default function Contacts() {
   const [showModal, setShowModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
   const [search, setSearch] = useState('')
   const qc = useQueryClient()
@@ -105,7 +107,10 @@ export default function Contacts() {
           <h1 className="text-2xl font-bold">Contacts</h1>
           <p className="text-sm text-gray-500">{contacts.length} contact{contacts.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}><Plus size={16} /> New Contact</button>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50" onClick={() => setShowImport(true)}><Upload size={16} /> Import CSV</button>
+          <button className="btn-primary flex items-center gap-2" onClick={() => { setEditingContact(null); setShowModal(true) }}><Plus size={16} /> New Contact</button>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -193,6 +198,7 @@ export default function Contacts() {
       </div>
 
       {/* Add Contact Modal */}
+      {showImport && <BulkUploadModal type="contacts" onClose={() => setShowImport(false)} onSuccess={() => { qc.invalidateQueries({ queryKey: ['contacts'] }); setShowImport(false) }} />}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Contact" size="lg">
         <ContactForm
           accounts={accounts}
