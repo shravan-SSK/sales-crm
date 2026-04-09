@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sourcesApi } from '../api'
 import {
   Plus, Pencil, Trash2, BarChart2, Users, TrendingUp, CheckCircle,
-  AlertCircle, Circle, Tag
+  AlertCircle, Circle, Tag, Upload
 } from 'lucide-react'
 import Modal from '../components/Modal'
+import BulkUploadModal from '../components/BulkUploadModal'
 
 const PRESET_COLORS = [
   '#6b7280', '#ef4444', '#f97316', '#f59e0b', '#10b981',
@@ -94,6 +95,7 @@ function StatCard({ label, value, icon: Icon, color }) {
 export default function Sources() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [showImport, setShowImport] = useState(false)
   const qc = useQueryClient()
 
   const { data: sources = [], isLoading } = useQuery({
@@ -126,9 +128,14 @@ export default function Sources() {
           <h1 className="text-2xl font-bold text-gray-900">Lead Sources</h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage your lead sources and track their performance</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> Add Source
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-2" onClick={() => setShowImport(true)}>
+            <Upload size={16} /> Import CSV
+          </button>
+          <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}>
+            <Plus size={16} /> Add Source
+          </button>
+        </div>
       </div>
 
       {sources.length > 0 && (
@@ -256,6 +263,7 @@ export default function Sources() {
         </div>
       )}
 
+      {showImport && <BulkUploadModal type="sources" onClose={() => setShowImport(false)} onSuccess={() => { setShowImport(false) }} />}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Lead Source">
         <SourceForm onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending} />
       </Modal>
