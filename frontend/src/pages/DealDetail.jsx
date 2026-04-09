@@ -94,119 +94,151 @@ function DocumentsTab({ dealId }) {
     queryKey: ['docs', dealId],
     queryFn: () => dealDetailApi.getDocuments(dealId),
   })
-  const addMut = useMutation({
-    mutationFn: (data) => dealDetailApi.addDocument(dealId, data),
-    onSuccess: () => { qc.invalidateQueries(['docs', dealId]); qc.invalidateQueries(['timeline', dealId]); setForm({ type: 'other', title: '', url: '', notes: '' }); setShowForm(false) }
-  })
-  const delMut = useMutation({
-    mutationFn: (docId) => dealDetailApi.deleteDocument(dealId, docId),
-    onSuccess: () => { qc.invalidateQueries(['docs', dealId]); qc.invalidateQueries(['timeline', dealId]) }
-  })
-
   const [showForm, setShowForm] = useState(false)
-  const [uploadMode, setUploadMode] = useState('url')
-  const fileInputRef = useRef(null)
-  const [form, setForm] = useState({ type: 'other', title: '', url: '', notes: '' })
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [form, setForm] = useState({ title: '', type: 'other', url: '', notes: '' })
+  const [selFile, setSelFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      set('url', evt.target.result)
-      if (!form.title) set('title', file.name)
+  const addMutation = useMutation({
+    mutationFn: (data) => dealDetailApi.addDocument(dealId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['docs', dealId] })
+      qc.invalidateQueries({ queryKey: ['timeline', dealId] })
+      setShowForm(false)
+      setForm({ title: '', type: 'other', url: '', notes: '' })
+      setSelFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (docId) => dealDetailApi.deleteDocument(dealId, docId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['docs', dealId] }) },
+  })
+
+  const handleSave = async () => {
+    if (!form.title.trim()) return
+    setUploading(true)
+    try {
+      let fileUrl = form.url.trim()
+      let fileName = null
+      let fileSize = null
+      if (selFile) {
+        const safeName = selFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = dealId + '/' + Date.now() + '-' + safeName
+        const mtype = selFile.type || 'application/octet-stream'
+        const sbUrl = 'https://ytndbkokmgaucesyemey.supabase.co'
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0bmRia29rbWdhdWNlc3llbWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NjgyMjgsImV4cCI6MjA5MTA0NDIyOH0.l59LB9Q7yQK-tbR0R0UTGUfZicu-_X79sPZDhweoXSE'
+        const resp = await fetch(sbUrl + '/storage/v1/object/deal-documents/' + path, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + sbKey, 'Content-Type': mtype },
+          body: selFile,
+        })
+        if (!resp.ok) { const msg = await resp.text(); throw new Error(msg) }
+        fileUrl = sbUrl + '/storage/v1/object/public/deal-documents/' + path
+        fileName = selFile.name
+        fileSize = selFile.size
+      }
+      await addMutation.mutateAsync({ ...form, url: fileUrl || null, file_name: fileName, file_size: fileSize })
+    } catch (err) {
+      alert('Could not save document: ' + err.message)
+    } finally {
+      setUploading(false)
     }
-    reader.readAsDataURL(file)
   }
+
+  const canPreview = (doc) => /\.(pdf|png|jpg|jpeg|gif|svg|webp)$/i.test(doc.file_name || doc.url || '')
+
+  if (isLoading) return <div className="text-sm text-gray-400 py-4 text-center">Loading documents…</div>
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button className="btn-primary flex items-center gap-1 text-sm" onClick={() => setShowForm(v => !v)}>
-          <Plus size={14} /> Add Document
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-500">{docs.length} document{docs.length !== 1 ? 's' : ''}</span>
+        <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+          <Plus className="w-4 h-4" /> Add Document
         </button>
       </div>
 
       {showForm && (
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+        <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Type</label>
-              <select className="input" value={form.type} onChange={e => set('type', e.target.value)}>
-                {DOC_TYPES.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
-              </select>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Title *</label>
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Document title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
             </div>
             <div>
-              <label className="label">Title *</label>
-              <input className="input" value={form.title} onChange={e => set('title', e.target.value)} placeholder="Document title" />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+                {DOC_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+              </select>
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <label className="label mb-0">Source</label>
-              <button type="button" className={`text-xs px-2 py-0.5 rounded border ${uploadMode === 'url' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`} onClick={() => { setUploadMode('url'); set('url', '') }}>URL Link</button>
-              <button type="button" className={`text-xs px-2 py-0.5 rounded border ${uploadMode === 'file' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`} onClick={() => { setUploadMode('file'); set('url', '') }}>Upload File</button>
-            </div>
-            {uploadMode === 'url' ? (
-              <input className="input" value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://..." />
-            ) : (
-              <div>
-                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
-                <button type="button" className="btn-secondary text-sm w-full text-left" onClick={() => fileInputRef.current?.click()}>
-                  {form.url ? '✓ File loaded — click to change' : '📁 Choose file from computer…'}
-                </button>
-              </div>
-            )}
+            <label className="block text-xs font-medium text-gray-600 mb-1">Upload File</label>
+            <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.txt,.zip" className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:border file:border-gray-300 file:rounded-lg file:text-sm file:bg-white hover:file:bg-gray-50" onChange={e => setSelFile(e.target.files[0] || null)} />
           </div>
           <div>
-            <label className="label">Notes</label>
-            <textarea className="input" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} />
+            <label className="block text-xs font-medium text-gray-600 mb-1">Or paste a URL</label>
+            <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="https://..." value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} />
           </div>
-          <div className="flex gap-2 justify-end">
-            <button className="btn-secondary text-sm" onClick={() => setShowForm(false)}>Cancel</button>
-            <button className="btn-primary text-sm" disabled={!form.title || addMut.isPending}
-              onClick={() => addMut.mutate(form)}>{addMut.isPending ? 'Saving…' : 'Save'}</button>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+            <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} placeholder="Optional notes…" value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => { setShowForm(false); setSelFile(null); setForm({ title: '', type: 'other', url: '', notes: '' }) }} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+            <button onClick={handleSave} disabled={uploading || !form.title.trim()} className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+              {uploading ? 'Saving…' : 'Save Document'}
+            </button>
           </div>
         </div>
       )}
 
-      {isLoading ? <div className="text-sm text-gray-400 py-4 text-center">Loading…</div> :
-        !docs.length ? <div className="text-sm text-gray-400 py-4 text-center">No documents yet.</div> :
-        <div className="space-y-2">
-          {docs.map(doc => (
-            <div key={doc.id} className="group flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-              <FileText size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.other}`}>{doc.type.toUpperCase()}</span>
-                  <span className="text-sm font-medium">{doc.title}</span>
-                  {doc.url ? (
-                    doc.url.startsWith('data:') ? (
-                      <a href={doc.url} download={doc.title || 'document'} className="text-xs text-blue-600 hover:underline">
-                        ⬇ Download file
-                      </a>
-                    ) : (
-                      <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate max-w-xs block">
-                        {doc.url}
-                      </a>
-                    )
-                  ) : null}
+      {docs.length === 0 && !showForm && (
+        <div className="text-sm text-gray-400 py-6 text-center">No documents yet. Click “Add Document” to attach files or links.</div>
+      )}
+
+      <div className="space-y-2">
+        {docs.map(doc => {
+          const typeClass = DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.other
+          return (
+            <div key={doc.id} className="flex items-start justify-between p-3 border border-gray-200 rounded-xl bg-white hover:bg-gray-50">
+              <div className="flex items-start gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-900">{doc.title}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeClass}`}>{doc.type}</span>
+                  </div>
+                  {doc.file_name && <div className="text-xs text-gray-500 mt-0.5">{doc.file_name}{doc.file_size ? ' · ' + (doc.file_size / 1024).toFixed(1) + ' KB' : ''}</div>}
+                  {doc.notes && <div className="text-xs text-gray-500 mt-1 italic">{doc.notes}</div>}
                 </div>
-                {doc.notes && <p className="text-xs text-gray-500 mt-1">{doc.notes}</p>}
-                <p className="text-xs text-gray-400 mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
               </div>
-              <button className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 flex-shrink-0"
-                onClick={() => window.confirm('Delete document?') && delMut.mutate(doc.id)}>
-                <Trash2 size={14} />
-              </button>
+              <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+                {doc.url && canPreview(doc) && (
+                  <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded-lg border border-indigo-200" title="Preview">
+                    <ExternalLink className="w-3.5 h-3.5" /> Preview
+                  </a>
+                )}
+                {doc.url && (
+                  <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200" title="Download" download={doc.file_name || undefined}>
+                    <ExternalLink className="w-3.5 h-3.5" /> Download
+                  </a>
+                )}
+                <button onClick={() => { if (window.confirm('Delete this document?')) deleteMutation.mutate(doc.id) }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      }
+          )
+        })}
+      </div>
     </div>
   )
 }
+
 
 // ── NOTES TAB ────────────────────────────────────────────────────────────────
 function NotesTab({ dealId }) {
