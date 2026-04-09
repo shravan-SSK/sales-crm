@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { dealsApi, accountsApi, contactsApi, sourcesApi } from '../api'
 import api from '../api'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Upload } from 'lucide-react'
 import Modal from '../components/Modal'
+import BulkUploadModal from '../components/BulkUploadModal'
 
 // Color palette cycled for dynamic stages
 const STAGE_COLORS = [
@@ -128,6 +129,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
 
 export default function Deals() {
   const [showModal, setShowModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editingDeal, setEditingDeal] = useState(null)
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -200,7 +202,10 @@ export default function Deals() {
             <span className="ml-4">Closed Won: <span className="font-semibold text-green-600">${closedWonValue.toLocaleString()}</span></span>
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}><Plus size={16} /> New Deal</button>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50" onClick={() => setShowImport(true)}><Upload size={16} /> Import CSV</button>
+          <button className="btn-primary flex items-center gap-2" onClick={() => setShowModal(true)}><Plus size={16} /> New Deal</button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -275,6 +280,7 @@ export default function Deals() {
         </div>
       )}
 
+      {showImport && <BulkUploadModal type="deals" onClose={() => setShowImport(false)} onSuccess={() => { qc.invalidateQueries({ queryKey: ['deals'] }); setShowImport(false) }} />}
       {/* Add Deal Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Deal" size="lg">
         <DealForm
