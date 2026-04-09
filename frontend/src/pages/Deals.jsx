@@ -102,7 +102,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
             <option value="">No Source</option>
             {sources.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
-        </div>   </div>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Deal Value ($)</label>
