@@ -108,7 +108,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      name, account_id, contact_id, stage, value, probability, close_date, notes, source,
+      name, account_id, contact_id, stage, value, probability, close_date, notes, source type,,
       new_account_name, new_contact_first_name, new_contact_last_name, new_contact_email
     } = req.body;
     if (!name) return res.status(400).json({ error: 'Deal name required' });
@@ -160,7 +160,7 @@ router.post('/', async (req, res) => {
     const { data, error } = await supabase.from('deals').insert({
       id: dealId, name, account_id: finalAccountId, contact_id: finalContactId,
       stage: dealStage, value: value || 0, probability: probability || 0,
-      close_date: close_date || null, notes: notes || null, source: source || null
+      close_date: close_date || null, notes: notes || null, source: source || nul, type: type || nulll
     }).select().single();
     if (error) throw error;
 
@@ -179,7 +179,7 @@ router.put('/:id', async (req, res) => {
     const { data: existing, error: fe } = await supabase.from('deals').select('*').eq('id', req.params.id).single();
     if (fe || !existing) return res.status(404).json({ error: 'Deal not found' });
 
-    const { name, account_id, contact_id, stage, value, probability, close_date, notes } = req.body;
+    const { name, account_id, contact_id, stage, value, probability, close_date, notes, type } = req.body;
     const oldStage = existing.stage;
     const newStage = stage ?? existing.stage;
 
@@ -192,6 +192,7 @@ router.put('/:id', async (req, res) => {
       probability: probability !== undefined ? probability : existing.probability,
       close_date: close_date !== undefined ? close_date : existing.close_date,
       notes: notes ?? existing.notes,
+      type: type ?? existing.type,
       updated_at: new Date().toISOString()
     }).eq('id', req.params.id).select().single();
     if (error) throw error;
