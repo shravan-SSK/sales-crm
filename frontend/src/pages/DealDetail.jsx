@@ -1,11 +1,12 @@
 import { useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { dealsApi, dealDetailApi, accountsApi, contactsApi } from '../api'
+import { dealsApi, dealDetailApi, accountsApi, contactsApi, activitiesApi } from '../api'
 import api from '../api'
 import {
   ArrowLeft, Edit2, FileText, MessageSquare, Video, Clock, Plus, Trash2,
-  ExternalLink, X, Save, ChevronDown, ChevronUp, Users, DollarSign, Calendar
+  ExternalLink, X, Save, ChevronDown, ChevronUp, Users, DollarSign, Calendar,
+  CheckCircle2, Circle, Phone, Mail, CheckSquare
 } from 'lucide-react'
 
 const STAGE_COLORS = [
@@ -428,6 +429,133 @@ function MeetingsTab({ dealId }) {
   )
 }
 
+// ── ACTIVITIES TAB ────────────────────────────────────────────────────────────────────────────────
+const ACT_ICONS = { call: Phone, email: Mail, meeting: Users, task: FileText, note: FileText }
+const ACT_COLORS = {
+  call: 'text-green-600 bg-green-50', email: 'text-blue-600 bg-blue-50',
+  meeting: 'text-purple-600 bg-purple-50', task: 'text-yellow-600 bg-yellow-50',
+  note: 'text-gray-600 bg-gray-100',
+}
+
+function ActivitiesTab({ dealId, contacts = [] }) {
+  const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ type: 'task', subject: '', description: '', contact_id: '', due_date: '' })
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const { data: activities = [], isLoading } = useQuery({
+    queryKey: ['deal-activities', dealId],
+    queryFn: () => activitiesApi.getAll({ deal_id: dealId }),
+  })
+
+  const createMut = useMutation({
+    mutationFn: (data) => activitiesApi.create({ ...data, deal_id: dealId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deal-activities', dealId] })
+      qc.invalidateQueries({ queryKey: ['timeline', dealId] })
+      qc.invalidateQueries({ queryKey: ['activities'] })
+      setShowForm(false)
+      setForm({ type: 'task', subject: '', description: '', contact_id: '', due_date: '' })
+    }
+  })
+
+  const toggleMut = useMutation({
+    mutationFn: (act) => activitiesApi.update(act.id, { completed: !act.completed }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deal-activities', dealId] })
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id) => activitiesApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deal-activities', dealId] })
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button className="btn-primary flex items-center gap-1 text-sm" onClick={() => setShowForm(v => !v)}>
+          <Plus size={14} /> Log Activity
+        </button>
+      </div>
+      {showForm && (
+        <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Type</label>
+              <select className="input" value={form.type} onChange={e => set('type', e.target.value)}>
+                <option value="task">Task</option>
+                <option value="call">Call</option>
+                <option value="email">Email</option>
+                <option value="meeting">Meeting</option>
+                <option value="note">Note</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Due Date</label>
+              <input className="input" type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="label">Subject *</label>
+            <input className="input" value={form.subject} onChange={e => set('subject', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea className="input" rows={2} value={form.description} onChange={e => set('description', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Contact</label>
+            <select className="input" value={form.contact_id} onChange={e => set('contact_id', e.target.value)}>
+              <option value="">No Contact</option>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button className="btn-secondary text-sm" onClick={() => setShowForm(false)}>Cancel</button>
+            <button className="btn-primary text-sm" disabled={!form.subject.trim() || createMut.isPending}
+              onClick={() => createMut.mutate(form)}>
+              {createMut.isPending ? 'Saving…' : 'Save Activity'}
+            </button>
+          </div>
+        </div>
+      )}
+      {isLoading ? (
+        <div className="text-sm text-gray-400 py-4 text-center">Loading…</div>
+      ) : activities.length === 0 ? (
+        <div className="text-sm text-gray-400 py-6 text-center">No activities yet. Log a call, email, task, or meeting.</div>
+      ) : (
+        <div className="space-y-2">
+          {activities.map(act => {
+            const Icon = ACT_ICONS[act.type] || FileText
+            const colorClass = ACT_COLORS[act.type] || ACT_COLORS.note
+            const isOverdue = !act.completed && act.due_date && new Date(act.due_date) < new Date()
+            return (
+              <div key={act.id} className={`flex items-start gap-3 p-3 border rounded-lg ${isOverdue ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'}`}>
+                <button onClick={() => toggleMut.mutate(act)} className="mt-0.5 flex-shrink-0">
+                  {act.completed
+                    ? <CheckCircle2 size={18} className="text-green-500" />
+                    : <Circle size={18} className="text-gray-300 hover:text-gray-400" />}
+                </button>
+                <div className={`p-1.5 rounded-lg flex-shrink-0 ${colorClass}`}><Icon size={13} /></div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${act.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{act.subject}</p>
+                  {act.description && <p className="text-xs text-gray-500 mt-0.5">{act.description}</p>}
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {act.contact_name && <span className="text-xs text-gray-500">{act.contact_name}</span>}
+                    {act.due_date && <span className={`text-xs ${isOverdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>{act.due_date}</span>}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${colorClass}`}>{act.type}</span>
+                  </div>
+                </div>
+                <button onClick={() => window.confirm('Delete this activity?') && deleteMut.mutate(act.id)}
+                  className="text-red-400 hover:text-red-600 p-1 text-xs flex-shrink-0">Del</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── MAIN DEAL DETAIL PAGE ────────────────────────────────────────────────────
 export default function DealDetail() {
   const { id } = useParams()
@@ -491,6 +619,7 @@ export default function DealDetail() {
 
   const TABS = [
     { id: 'timeline', label: 'Timeline', icon: Clock },
+    { id: 'activities', label: 'Activities', icon: CheckSquare },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'notes', label: 'Notes', icon: MessageSquare },
     { id: 'meetings', label: 'Meetings', icon: Video },
@@ -634,6 +763,7 @@ export default function DealDetail() {
       {/* Tab Content */}
       <div className="min-h-48">
         {activeTab === 'timeline' && <TimelineTab dealId={id} />}
+      {activeTab === 'activities' && <ActivitiesTab dealId={id} contacts={contacts} />}
         {activeTab === 'documents' && <DocumentsTab dealId={id} />}
         {activeTab === 'notes' && <NotesTab dealId={id} />}
         {activeTab === 'meetings' && <MeetingsTab dealId={id} />}
