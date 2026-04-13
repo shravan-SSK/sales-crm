@@ -231,7 +231,7 @@ export default function Deals() {
       </div>
       {isLoading ? (
         <div className="text-center py-8 text-gray-500">Loading deals...</div>
-      ) : deals.length === 0 ? (
+      ) : filteredDeals.length === 0 ? (
         <div className="text-center py-8 text-gray-500">No deals yet. Create one to get started.</div>
       ) : (
         <div className="card overflow-hidden">
@@ -239,7 +239,7 @@ export default function Deals() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Deal Name</th>
-                <th className="text-left px-4 py-3 text-filteredDeals.length === 0t-gray-500 uppercase">Account</th>
+                <th className="text-left px-4 py-3 text-gray-500 uppercase">Account</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Contact</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Stage</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Source</th>
@@ -251,7 +251,7 @@ export default function Deals() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {deals.map(deal => {
+              {filteredDeals.map(deal => {
                 const cfg = stageConfig[deal.stage] || STAGE_COLORS[0]
                 return (
                   <tr
@@ -260,7 +260,7 @@ export default function Deals() {
                     className="hover:bg-gray-50 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">{deal.name}</td>
-                    <td className="px-4 py-3 text-gray-60filteredDeals.map(ccount_name || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600">{deal.account_name || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">
                       {deal.contact_id ? (
                         <>
