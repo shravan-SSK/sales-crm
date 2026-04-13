@@ -246,7 +246,8 @@ export default function Deals() {
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Value</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Probability</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Close Date</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Type</th>
+               <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -256,8 +257,7 @@ export default function Deals() {
                   <tr
                     key={deal.id}
                     onClick={() => navigate(`/deals/${deal.id}`)}
-                    cl<th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Type</th>
-                assName="hover:bg-gray-50 cursor-pointer"
+                    className="hover:bg-gray-50 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">{deal.name}</td>
                     <td className="px-4 py-3 text-gray-60filteredDeals.map(ccount_name || '-'}</td>
