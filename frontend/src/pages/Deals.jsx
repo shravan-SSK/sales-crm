@@ -39,6 +39,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
     close_date: initial.close_date || '',
     notes: initial.notes || '',
     source: initial.source || '',
+    type: initial.type || '',
   })
   const [newAccountName, setNewAccountName] = useState('')
   const [newContactFirst, setNewContactFirst] = useState('')
@@ -105,6 +106,15 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
           </select>
         </div>
       </div>
+      <div className="mb-4">
+        <label className="label">Deal Type</label>
+        <select className="input" value={form.type} onChange={e => set('type', e.target.value)}>
+          <option value="">— Select type —</option>
+          {['Marketing Retainer','Tech Retainer','CRO','Tech Milestone'].map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="label">Deal Value ($)</label>
           <input className="input" type="number" min="0" step="0.01" value={form.value} onChange={e => set('value', e.target.value)} />
@@ -130,6 +140,7 @@ function DealForm({ initial = {}, accounts = [], contacts = [], stages = [], sta
 export default function Deals() {
   const [showModal, setShowModal] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [activeType, setActiveType] = useState('All')
   const [editingDeal, setEditingDeal] = useState(null)
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -191,6 +202,7 @@ export default function Deals() {
   const totalValue = deals.reduce((sum, d) => sum + (d.value || 0), 0)
   const closedWonDeals = deals.filter(d => d.stage === 'closed_won')
   const closedWonValue = closedWonDeals.reduce((sum, d) => sum + (d.value || 0), 0)
+  const filteredDeals = activeType === 'All' ? deals : deals.filter(d => d.type === activeType)
 
   return (
     <div className="space-y-5">
@@ -208,6 +220,15 @@ export default function Deals() {
         </div>
       </div>
 
+      <div className="flex gap-1 flex-wrap">
+        {['All','Marketing Retainer','Tech Retainer','CRO','Tech Milestone'].map(t => (
+          <button
+            key={t}
+            onClick={() => setActiveType(t)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${activeType === t ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >{t}</button>
+        ))}
+      </div>
       {isLoading ? (
         <div className="text-center py-8 text-gray-500">Loading deals...</div>
       ) : deals.length === 0 ? (
@@ -218,7 +239,7 @@ export default function Deals() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Deal Name</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Account</th>
+                <th className="text-left px-4 py-3 text-filteredDeals.length === 0t-gray-500 uppercase">Account</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Contact</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Stage</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Source</th>
@@ -235,10 +256,11 @@ export default function Deals() {
                   <tr
                     key={deal.id}
                     onClick={() => navigate(`/deals/${deal.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    cl<th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Type</th>
+                assName="hover:bg-gray-50 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">{deal.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{deal.account_name || '-'}</td>
+                    <td className="px-4 py-3 text-gray-60filteredDeals.map(ccount_name || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">
                       {deal.contact_id ? (
                         <>
@@ -263,7 +285,8 @@ export default function Deals() {
                         >
                           <Pencil size={16} />
                         </button>
-                        <button
+                        <
+                    <td className="px-4 py-3 text-gray-600">{deal.type || '-'}</td>button
                           onClick={(e) => { e.stopPropagation(); deleteMut.mutate(deal.id) }}
                           className="text-red-600 hover:text-red-800 p-1"
                           disabled={deleteMut.isPending}
