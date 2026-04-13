@@ -277,6 +277,7 @@ export default function Deals() {
                     <td className="px-4 py-3 text-right font-semibold text-green-600">${(deal.value || 0).toLocaleString()}</td>
                     <td className="px-4 py-3 text-center text-gray-600">{deal.probability}%</td>
                     <td className="px-4 py-3 text-gray-600">{deal.close_date || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600">{deal.type || '-'}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -285,8 +286,7 @@ export default function Deals() {
                         >
                           <Pencil size={16} />
                         </button>
-                        <
-                    <td className="px-4 py-3 text-gray-600">{deal.type || '-'}</td>button
+                        <button
                           onClick={(e) => { e.stopPropagation(); deleteMut.mutate(deal.id) }}
                           className="text-red-600 hover:text-red-800 p-1"
                           disabled={deleteMut.isPending}
