@@ -20,14 +20,19 @@ router.get('/:id', async (req, res) => {
     const { data: contact, error } = await supabase.from('contacts').select('*, accounts(name)').eq('id', req.params.id).single();
     if (error || !contact) return res.status(404).json({ error: 'Contact not found' });
     const result = { ...contact, account_name: contact.accounts?.name || null, accounts: undefined };
-    const [dealsR, activitiesR, emailsR] = await Promise.all([
-      supabase.from('deals').select('*, accounts(name)').eq('contact_id', req.params.id),
-      supabase.from('activities').select('*').eq('contact_id', req.params.id).order('created_at', { ascending: false }).limit(10),
-      supabase.from('email_threads').select('*').eq('contact_id', req.params.id).order('received_at', { ascending: false }).limit(10),
-    ]);
-    result.deals = (dealsR.data || []).map(d => ({ ...d, account_name: d.accounts?.name || null, accounts: undefined }));
-    result.activities = activitiesR.data || [];
-    result.emails = emailsR.data || [];
+    const [dealsR, activitiesR, emailsR, stakeholderDealsR] = await Promise.all([
+        supabase.from('deals').select('*, accounts(name)').eq('contact_id', req.params.id),
+        supabase.from('activities').select('*').eq('contact_id', req.params.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('email_threads').select('*').eq('contact_id', req.params.id).order('received_at', { ascending: false }).limit(10),
+        supabase.from('deal_stakeholders').select('*, deals(id,name,stage,value,accounts(name))').eq('contact_id', req.params.id),
+      ]);
+      result.deals = (dealsR.data || []).map(d => ({ ...d, account_name: d.accounts?.name || null, accounts: undefined }));
+      result.stakeholder_deals = (stakeholderDealsR.data || []).map(s => ({
+        id: s.deals?.id, name: s.deals?.name, stage: s.deals?.stage,
+        value: s.deals?.value, account_name: s.deals?.accounts?.name || null, role: s.role,
+      })).filter(d => d.id);
+      result.activities = activitiesR.data || [];
+      result.emails = emailsR.data || [];
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
