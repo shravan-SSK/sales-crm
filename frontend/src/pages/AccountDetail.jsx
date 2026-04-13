@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { accountsApi } from '../api'
-import { ArrowLeft, Building2, Globe, Phone, MapPin, Users, Briefcase, TrendingUp, DollarSign, Mail } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { accountsApi, activitiesApi } from '../api'
+import { ArrowLeft, Building2, Globe, Phone, MapPin, Users, Briefcase, TrendingUp, DollarSign, Mail, CheckCircle2, Circle, FileText, Clock } from 'lucide-react'
 
 const STAGE_CONFIG = {
   lead:        { label: 'Lead',        color: 'bg-blue-100 text-blue-700' },
@@ -15,9 +15,19 @@ export default function AccountDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
+  const qc = useQueryClient()
   const { data: account, isLoading, isError } = useQuery({
     queryKey: ['account', id],
     queryFn: () => accountsApi.get(id),
+  })
+  const { data: accountActivities = [] } = useQuery({
+    queryKey: ['account-activities', id],
+    queryFn: () => activitiesApi.getAll({ account_id: id }),
+    enabled: !!id,
+  })
+  const toggleActivityMut = useMutation({
+    mutationFn: (act) => activitiesApi.update(act.id, { completed: !act.completed }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['account-activities', id] }),
   })
 
   if (isLoading) return (
@@ -225,6 +235,49 @@ export default function AccountDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Activity Log */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <Clock size={14} /> Activity Log
+          </h2>
+          <span className="text-xs text-gray-400">{accountActivities.length} total</span>
+        </div>
+        {accountActivities.length === 0 ? (
+          <div className="py-8 text-center text-gray-400 text-sm">No activities logged for deals in this account.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {accountActivities.map(act => {
+              const isOverdue = !act.completed && act.due_date && new Date(act.due_date) < new Date()
+              const typeColors = {
+                call: 'text-green-600 bg-green-50', email: 'text-blue-600 bg-blue-50',
+                meeting: 'text-purple-600 bg-purple-50', task: 'text-yellow-600 bg-yellow-50',
+                note: 'text-gray-600 bg-gray-100',
+              }
+              const colorClass = typeColors[act.type] || typeColors.note
+              return (
+                <div key={act.id} className={`flex items-start gap-3 px-5 py-3 ${isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+                  <button onClick={() => toggleActivityMut.mutate(act)} className="mt-0.5 flex-shrink-0">
+                    {act.completed
+                      ? <CheckCircle2 size={16} className="text-green-500" />
+                      : <Circle size={16} className="text-gray-300 hover:text-gray-400" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${act.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{act.subject}</p>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {act.deal_name && <span className="text-xs text-blue-600 font-medium">{act.deal_name}</span>}
+                      {act.contact_name && <span className="text-xs text-gray-500">{act.contact_name}</span>}
+                      {act.due_date && <span className={`text-xs ${isOverdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>{act.due_date}</span>}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${colorClass}`}>{act.type}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
