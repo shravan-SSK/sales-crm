@@ -108,7 +108,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      name, account_id, contact_id, stage, value, probability, close_date, notes, source type,,
+      name, account_id, contact_id, stage, value, probability, close_date, notes, source, type,
       new_account_name, new_contact_first_name, new_contact_last_name, new_contact_email
     } = req.body;
     if (!name) return res.status(400).json({ error: 'Deal name required' });
