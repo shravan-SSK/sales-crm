@@ -92,14 +92,14 @@ router.get('/:id', async (req, res) => {
     if (error || !deal) return res.status(404).json({ error: 'Deal not found' });
     const [activitiesR, stakeholdersR] = await Promise.all([
       supabase.from('activities').select('*').eq('deal_id', req.params.id).order('created_at', { ascending: false }),
-      supabase.from('deal_stakeholders').select('*, contacts(id,first_name,last_name,email,title)').eq('deal_id', req.params.id),
+      supabase.from('deal_stakeholders').select('*, contacts(id,first_name,last_name,email,title,linkedin_scan_status)').eq('deal_id', req.params.id),
     ]);
     res.json({
       ...deal,
       account_name: deal.accounts?.name || null,
       contact_name: deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : null,
       activities: activitiesR.data || [],
-      stakeholders: (stakeholdersR.data || []).map(s => ({ ...s, ...s.contacts, contacts: undefined }))
+      stakeholders: (stakeholdersR.data || []).map(s => ({ stakeholder_id: s.id, role: s.role, ...s.contacts }))
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
