@@ -2,13 +2,14 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import {
   LayoutDashboard, Users, UserCheck, Building2, Kanban,
-  Activity, Mail, Settings, Search, Bell, Tag
+  Activity, Mail, Settings, Search, Bell, Tag, Linkedin
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { activitiesApi, searchApi } from '../api'
 
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/leads', icon: Linkedin, label: 'Leads' },
   { to: '/deals', icon: UserCheck, label: 'Deals' },
   { to: '/sources', icon: Tag, label: 'Sources' },
   { to: '/contacts', icon: Users, label: 'Contacts' },
