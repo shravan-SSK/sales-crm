@@ -12,6 +12,7 @@ import EmailThreads from './pages/EmailThreads'
 import Sources from './pages/Sources'
 import DealDetail from './pages/DealDetail'
 import Leads from './pages/Leads'
+import ContactDetail from './pages/ContactDetail'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="deals/:id" element={<DealDetail />} />
           <Route path="leads" element={<Leads />} />
           <Route path="contacts" element={<Contacts />} />
+              <Route path="contacts/:id" element={<ContactDetail />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="accounts/:id" element={<AccountDetail />} />
           <Route path="pipeline" element={<Pipeline />} />
