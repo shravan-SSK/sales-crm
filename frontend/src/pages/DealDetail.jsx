@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { dealsApi, dealDetailApi, accountsApi, contactsApi, activitiesApi } from '../api'
 import api from '../api'
@@ -556,6 +556,102 @@ function ActivitiesTab({ dealId, contacts = [] }) {
   )
 }
 
+// ── CONTACTS TAB ─────────────────────────────────────────────────────────────
+function ContactsTab({ dealId, deal, contacts = [] }) {
+  const qc = useQueryClient()
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState({ contact_id: '', role: '' })
+  const stakeholders = deal?.stakeholders || []
+
+  const addMut = useMutation({
+    mutationFn: () => dealsApi.addStakeholder(dealId, addForm.contact_id, addForm.role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deal', dealId] })
+      setShowAddForm(false)
+      setAddForm({ contact_id: '', role: '' })
+    },
+  })
+
+  const removeMut = useMutation({
+    mutationFn: (stakeholderId) => dealsApi.removeStakeholder(dealId, stakeholderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deal', dealId] }),
+  })
+
+  const availableContacts = contacts.filter(c => !stakeholders.some(s => s.id === c.id))
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button className="btn-primary flex items-center gap-1 text-sm" onClick={() => setShowAddForm(v => !v)}>
+          <Plus size={14} /> Add Contact
+        </button>
+      </div>
+      {showAddForm && (
+        <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Contact *</label>
+              <select className="input" value={addForm.contact_id}
+                onChange={e => setAddForm(f => ({ ...f, contact_id: e.target.value }))}>
+                <option value="">Select contact...</option>
+                {availableContacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Role</label>
+              <input className="input" placeholder="e.g. Champion, Decision Maker..."
+                value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value }))} />
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button className="btn-secondary text-sm" onClick={() => setShowAddForm(false)}>Cancel</button>
+            <button className="btn-primary text-sm" disabled={!addForm.contact_id || addMut.isPending}
+              onClick={() => addMut.mutate()}>
+              {addMut.isPending ? 'Adding...' : 'Add to Deal'}
+            </button>
+          </div>
+        </div>
+      )}
+      {stakeholders.length === 0 && !showAddForm && (
+        <div className="text-sm text-gray-400 py-6 text-center">
+          No contacts linked yet. Click "Add Contact" to link contacts to this deal.
+        </div>
+      )}
+      <div className="space-y-2">
+        {stakeholders.map(s => (
+          <div key={s.stakeholder_id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-semibold text-indigo-600 flex-shrink-0">
+                {(s.first_name?.[0] || '').toUpperCase()}{(s.last_name?.[0] || '').toUpperCase()}
+              </div>
+              <div>
+                <Link to={`/contacts/${s.id}`}
+                  className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline">
+                  {s.first_name} {s.last_name}
+                </Link>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {s.title && <p className="text-xs text-gray-500">{s.title}</p>}
+                  {s.role && <span className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded-full">{s.role}</span>}
+                  {s.linkedin_scan_status === 'done' && (
+                    <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> LinkedIn</span>
+                  )}
+                  {s.email && <a href={`mailto:${s.email}`} className="text-xs text-blue-600 hover:underline">{s.email}</a>}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => { if (window.confirm('Remove this contact from the deal?')) removeMut.mutate(s.stakeholder_id) }}
+              className="text-red-400 hover:text-red-600 p-1 ml-2">
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── MAIN DEAL DETAIL PAGE ────────────────────────────────────────────────────
 export default function DealDetail() {
   const { id } = useParams()
@@ -620,6 +716,7 @@ export default function DealDetail() {
   const TABS = [
     { id: 'timeline', label: 'Timeline', icon: Clock },
     { id: 'activities', label: 'Activities', icon: CheckSquare },
+    { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'notes', label: 'Notes', icon: MessageSquare },
     { id: 'meetings', label: 'Meetings', icon: Video },
@@ -764,6 +861,7 @@ export default function DealDetail() {
       <div className="min-h-48">
         {activeTab === 'timeline' && <TimelineTab dealId={id} />}
       {activeTab === 'activities' && <ActivitiesTab dealId={id} contacts={contacts} />}
+        {activeTab === 'contacts' && <ContactsTab dealId={id} deal={deal} contacts={contacts} />}
         {activeTab === 'documents' && <DocumentsTab dealId={id} />}
         {activeTab === 'notes' && <NotesTab dealId={id} />}
         {activeTab === 'meetings' && <MeetingsTab dealId={id} />}
