@@ -25,6 +25,7 @@ export const contactsApi = {
   delete: (id) => api.delete(`/contacts/${id}`).then(r => r.data),
   requestScan: (id, linkedin_url) => api.post(`/contacts/${id}/scan-request`, { linkedin_url }).then(r => r.data),
   saveLinkedInData: (id, data) => api.post(`/contacts/${id}/linkedin-data`, data).then(r => r.data),
+  getPendingScans: () => api.get('/contacts/pending-linkedin-scans').then(r => r.data),
 }
 
 export const scanQueueApi = {
