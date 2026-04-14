@@ -614,13 +614,13 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
           </div>
         </div>
       )}
-      {stakeholders.length === 0 && !showAddForm && (
+      {allContacts.length === 0 && !showAddForm && (
         <div className="text-sm text-gray-400 py-6 text-center">
           No contacts linked yet. Click "Add Contact" to link contacts to this deal.
         </div>
       )}
       <div className="space-y-2">
-        {stakeholders.map(s => (
+        {allContacts.map(s => (
           <div key={s.stakeholder_id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-semibold text-indigo-600 flex-shrink-0">
@@ -633,7 +633,7 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
                 </Link>
                 <div className="flex items-center gap-2 flex-wrap">
                   {s.title && <p className="text-xs text-gray-500">{s.title}</p>}
-                  {s.role && <span className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded-full">{s.role}</span>}
+                  {s.role && <span className={`text-xs px-1.5 py-0.5 rounded-full ${s.isPrimary ? 'bg-blue-100 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>{s.role}</span>}
                   {s.linkedin_scan_status === 'done' && (
                     <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> LinkedIn</span>
                   )}
@@ -641,10 +641,12 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
                 </div>
               </div>
             </div>
-            <button onClick={() => { if (window.confirm('Remove this contact from the deal?')) removeMut.mutate(s.stakeholder_id) }}
-              className="text-red-400 hover:text-red-600 p-1 ml-2">
-              <X size={14} />
-            </button>
+            {!s.isPrimary && (
+              <button onClick={() => { if (window.confirm('Remove this contact from the deal?')) removeMut.mutate(s.stakeholder_id) }}
+                className="text-red-400 hover:text-red-600 p-1 ml-2">
+                <X size={14} />
+              </button>
+            )}
           </div>
         ))}
       </div>
