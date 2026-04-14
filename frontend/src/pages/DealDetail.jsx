@@ -562,6 +562,12 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState({ contact_id: '', role: '' })
   const stakeholders = deal?.stakeholders || []
+  const primaryContact = deal?.contact_id ? contacts.find(c => c.id === deal.contact_id) : null
+  const primaryNotInStakeholders = primaryContact && !stakeholders.some(s => s.id === primaryContact.id)
+  const allContacts = [
+    ...(primaryNotInStakeholders ? [{ ...primaryContact, stakeholder_id: '__primary__', role: 'Primary Contact', isPrimary: true }] : []),
+    ...stakeholders,
+  ]
 
   const addMut = useMutation({
     mutationFn: () => dealsApi.addStakeholder(dealId, addForm.contact_id, addForm.role),
@@ -577,7 +583,7 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['deal', dealId] }),
   })
 
-  const availableContacts = contacts.filter(c => !stakeholders.some(s => s.id === c.id))
+  const availableContacts = contacts.filter(c => !allContacts.some(s => s.id === c.id))
 
   return (
     <div className="space-y-4">
