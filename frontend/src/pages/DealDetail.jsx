@@ -561,13 +561,13 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
   const qc = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState({ contact_id: '', role: '' })
+
   const stakeholders = deal?.stakeholders || []
-  const primaryContact = deal?.contact_id ? contacts.find(c => c.id === deal.contact_id) : null
-  const primaryNotInStakeholders = primaryContact && !stakeholders.some(s => s.id === primaryContact.id)
-  const allContacts = [
-    ...(primaryNotInStakeholders ? [{ ...primaryContact, stakeholder_id: '__primary__', role: 'Primary Contact', isPrimary: true }] : []),
-    ...stakeholders,
-  ]
+
+  // Build the primary contact entry if it exists and isn't already a stakeholder
+  const primaryId = deal?.contact_id || null
+  const primaryEntry = primaryId && contacts.find(c => c.id === primaryId)
+  const primaryAlreadyStakeholder = stakeholders.some(s => s.id === primaryId)
 
   const addMut = useMutation({
     mutationFn: () => dealsApi.addStakeholder(dealId, addForm.contact_id, addForm.role),
@@ -583,7 +583,14 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['deal', dealId] }),
   })
 
-  const availableContacts = contacts.filter(c => !allContacts.some(s => s.id === c.id))
+  // Contacts already shown (primary + stakeholders) — exclude from add dropdown
+  const shownIds = new Set([
+    ...(primaryEntry && !primaryAlreadyStakeholder ? [primaryId] : []),
+    ...stakeholders.map(s => s.id),
+  ])
+  const availableContacts = contacts.filter(c => !shownIds.has(c.id))
+
+  const totalShown = stakeholders.length + (primaryEntry && !primaryAlreadyStakeholder ? 1 : 0)
 
   return (
     <div className="space-y-4">
@@ -620,13 +627,37 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
           </div>
         </div>
       )}
-      {allContacts.length === 0 && !showAddForm && (
+      {totalShown === 0 && !showAddForm && (
         <div className="text-sm text-gray-400 py-6 text-center">
           No contacts linked yet. Click "Add Contact" to link contacts to this deal.
         </div>
       )}
       <div className="space-y-2">
-        {allContacts.map(s => (
+        {/* Primary contact row */}
+        {primaryEntry && !primaryAlreadyStakeholder && (
+          <div className="flex items-center justify-between p-3 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-200 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
+                {(primaryEntry.first_name?.[0] || '').toUpperCase()}{(primaryEntry.last_name?.[0] || '').toUpperCase()}
+              </div>
+              <div>
+                <Link to={`/contacts/${primaryEntry.id}`}
+                  className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline">
+                  {primaryEntry.first_name} {primaryEntry.last_name}
+                </Link>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                  {primaryEntry.title && <p className="text-xs text-gray-500">{primaryEntry.title}</p>}
+                  <span className="text-xs px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-medium">Primary Contact</span>
+                  {primaryEntry.linkedin_scan_status === 'done' && (
+                    <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> LinkedIn</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Stakeholder rows */}
+        {stakeholders.map(s => (
           <div key={s.stakeholder_id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-semibold text-indigo-600 flex-shrink-0">
@@ -637,9 +668,9 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
                   className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline">
                   {s.first_name} {s.last_name}
                 </Link>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
                   {s.title && <p className="text-xs text-gray-500">{s.title}</p>}
-                  {s.role && <span className={`text-xs px-1.5 py-0.5 rounded-full ${s.isPrimary ? 'bg-blue-100 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>{s.role}</span>}
+                  {s.role && <span className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded-full">{s.role}</span>}
                   {s.linkedin_scan_status === 'done' && (
                     <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> LinkedIn</span>
                   )}
@@ -647,12 +678,11 @@ function ContactsTab({ dealId, deal, contacts = [] }) {
                 </div>
               </div>
             </div>
-            {!s.isPrimary && (
-              <button onClick={() => { if (window.confirm('Remove this contact from the deal?')) removeMut.mutate(s.stakeholder_id) }}
-                className="text-red-400 hover:text-red-600 p-1 ml-2">
-                <X size={14} />
-              </button>
-            )}
+            <button
+              onClick={() => { if (window.confirm('Remove this contact from the deal?')) removeMut.mutate(s.stakeholder_id) }}
+              className="text-red-400 hover:text-red-600 p-1 ml-2 flex-shrink-0">
+              <X size={14} />
+            </button>
           </div>
         ))}
       </div>
