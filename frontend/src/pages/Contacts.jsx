@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactsApi, accountsApi } from '../api'
 import { Plus, Pencil, Trash2, Mail, Phone, Search, Upload } from 'lucide-react'
@@ -53,6 +54,7 @@ function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoadin
 }
 
 export default function Contacts() {
+  const navigate = useNavigate()
   const [showModal, setShowModal] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
@@ -150,7 +152,7 @@ export default function Contacts() {
                 return (
                   <tr
                     key={contact.id}
-                    onClick={() => setEditingContact(contact)}
+                    onClick={() => navigate(`/contacts/${contact.id}`)}
                     className="hover:bg-gray-50 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">{contact.first_name} {contact.last_name}</td>
