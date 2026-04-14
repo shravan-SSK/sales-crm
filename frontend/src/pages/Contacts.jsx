@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { contactsApi, accountsApi } from '../api'
+import { contactsApi, accountsApi, dealsApi } from '../api'
 import { Plus, Pencil, Trash2, Mail, Phone, Search, Upload } from 'lucide-react'
 import Modal from '../components/Modal'
 import BulkUploadModal from '../components/BulkUploadModal'
 
-function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoading }) {
+function ContactForm({ initial = {}, accounts = [], deals = [], onSubmit, onCancel, isLoading }) {
   const [form, setForm] = useState({
     first_name: initial.first_name || '',
     last_name: initial.last_name || '',
@@ -15,6 +15,7 @@ function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoadin
     account_id: initial.account_id || '',
     title: initial.title || '',
     notes: initial.notes || '',
+    deal_id: initial.deal_id || '',
   })
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -45,6 +46,16 @@ function ContactForm({ initial = {}, accounts = [], onSubmit, onCancel, isLoadin
         <div><label className="label">Job Title</label><input className="input" value={form.title} onChange={e => set('title', e.target.value)} /></div>
       </div>
       <div><label className="label">Notes</label><textarea className="input" rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
+  {deals.length > 0 && (
+    <div>
+      <label className="label">Link to Deal <span className="text-gray-400 font-normal">(optional)</span></label>
+      <select className="input" value={form.deal_id} onChange={e => set('deal_id', e.target.value)}>
+        <option value="">No Deal</option>
+        {deals.map(d => <option key={d.id} value={d.id}>{d.name}{d.account_name ? ` — ${d.account_name}` : ''}</option>)}
+      </select>
+      <p className="text-xs text-gray-400 mt-1">Contact will be added as a stakeholder on the selected deal</p>
+    </div>
+  )}
       <div className="flex gap-3 justify-end">
         <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn-primary" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Contact'}</button>
@@ -63,6 +74,7 @@ export default function Contacts() {
 
   const { data: contacts = [], isLoading } = useQuery({ queryKey: ['contacts'], queryFn: contactsApi.getAll })
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll })
+  const { data: deals = [] } = useQuery({ queryKey: ['deals'], queryFn: dealsApi.getAll })
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -77,19 +89,31 @@ export default function Contacts() {
   }, [contacts, accounts, search])
 
   const createMut = useMutation({
-    mutationFn: contactsApi.create,
+    mutationFn: async (formData) => {
+      const { deal_id, ...contactData } = formData
+      const contact = await contactsApi.create(contactData)
+      if (deal_id) await dealsApi.addStakeholder(deal_id, contact.id, '')
+      return contact
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['deals'] })
       setShowModal(false)
     }
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => contactsApi.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const { deal_id, ...contactData } = data
+      const contact = await contactsApi.update(id, contactData)
+      if (deal_id) await dealsApi.addStakeholder(deal_id, id, '')
+      return contact
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contacts'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['deals'] })
       setEditingContact(null)
     }
   })
@@ -203,7 +227,7 @@ export default function Contacts() {
       {showImport && <BulkUploadModal type="contacts" onClose={() => setShowImport(false)} onSuccess={() => { qc.invalidateQueries({ queryKey: ['contacts'] }); setShowImport(false) }} />}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Contact" size="lg">
         <ContactForm
-          accounts={accounts}
+          accounts={accounts} deals={deals}
           onSubmit={createMut.mutate} onCancel={() => setShowModal(false)} isLoading={createMut.isPending}
         />
       </Modal>
@@ -211,7 +235,7 @@ export default function Contacts() {
       {/* Edit Contact Modal */}
       <Modal isOpen={!!editingContact} onClose={() => setEditingContact(null)} title="Edit Contact" size="lg">
         {editingContact && <ContactForm
-          initial={editingContact} accounts={accounts}
+          initial={editingContact} accounts={accounts} deals={deals}
           onSubmit={data => updateMut.mutate({ id: editingContact.id, data })}
           onCancel={() => setEditingContact(null)} isLoading={updateMut.isPending}
         />}
