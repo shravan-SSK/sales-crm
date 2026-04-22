@@ -126,20 +126,7 @@ export default function ContactDetail() {
     },
   })
 
-  // Auto-trigger scan when contact page opens:
-  // fires if linkedin_url is set and data is missing or older than 7 days
-  useEffect(() => {
-    if (!contact) return
-    if (!contact.linkedin_url) return
-    if (contact.linkedin_scan_status === 'pending') return
-    const scrapedAt = contact.linkedin_data?.scraped_at
-    const daysSince = scrapedAt
-      ? (Date.now() - new Date(scrapedAt).getTime()) / (1000 * 60 * 60 * 24)
-      : Infinity
-    if (!contact.linkedin_data || daysSince > 7) {
-      scanMut.mutate(contact.linkedin_url)
-    }
-  }, [contact?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // LinkedIn scan is triggered manually via button or by asking Claude in chat
 
   const startEdit = () => {
     setEditForm({
@@ -291,9 +278,9 @@ export default function ContactDetail() {
             ) : (
               <p className="text-xs text-gray-400">
                 {scanStatus === 'pending'
-                  ? 'Scan in progress — refreshing automatically...'
+                  ? 'Scan queued — ask Claude to scan pending LinkedIn profiles to process it.'
                   : contact.linkedin_url
-                    ? 'Queuing scan automatically...'
+                    ? 'Scan queued — ask Claude to scan pending LinkedIn profiles.'
                     : 'Add a LinkedIn URL in Edit to enable scanning.'}
               </p>
             )}
