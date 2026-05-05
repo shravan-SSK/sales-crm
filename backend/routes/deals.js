@@ -160,7 +160,7 @@ router.post('/', async (req, res) => {
     const { data, error } = await supabase.from('deals').insert({
       id: dealId, name, account_id: finalAccountId, contact_id: finalContactId,
       stage: dealStage, value: value || 0, probability: probability || 0,
-      close_date: close_date || null, notes: notes || null, source: source || nul, type: type || nulll
+      close_date: close_date || null, notes: notes || null, source: source || null, type: type || null
     }).select().single();
     if (error) throw error;
 
