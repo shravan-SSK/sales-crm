@@ -4,7 +4,13 @@ const baseURL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api'
 
-const api = axios.create({ baseURL, headers: { 'Content-Type': 'application/json' } })
+const api = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+    ...(import.meta.env.VITE_API_KEY ? { 'X-API-Key': import.meta.env.VITE_API_KEY } : {}),
+  }
+})
 
 export const leadsApi = {
   getAll: (params) => api.get('/leads', { params }).then(r => r.data),
